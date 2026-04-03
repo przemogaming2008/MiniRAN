@@ -26,12 +26,32 @@ const FlowMetrics& Ue::metrics() const {
 }
 
 void Ue::startAttach(std::uint64_t nowMs) {
-    (void)nowMs;
+    //(void)nowMs;
     // TODO(student):
     // 1. Ask SessionManager if attach may start.
-    // 2. Create AttachRequest message.
-    // 3. Encode it using FrameCodec.
-    // 4. Push a control-plane datagram to outgoing_.
+    if(sessionManager_.beginAttach(nowMs) == true){
+        // 2. Create AttachRequest message.
+        ProtocolMessage msg = makeMessage(
+            MessageType::AttachRequest,
+            sessionManager_.ueId(),
+            sessionManager_.sessionId(),
+            sessionManager_.nextSequenceNumber(),
+            nowMs
+        );
+        // 3. Encode it using FrameCodec.
+        std::vector<std::uint8_t> encoded_msg = FrameCodec().encode(msg); 
+        // 4. Push a control-plane datagram to outgoing_.
+        Datagram datagram = Datagram{};
+        
+        datagram.fromNodeId = nodeId_;
+        datagram.toNodeId = accessNodeId_ ;
+        datagram.enqueueTimeMs = nowMs;
+        datagram.controlPlane = true;
+        datagram.bytes = encoded_msg;
+
+        outgoing_.push_back(datagram);
+    }
+
 }
 
 void Ue::startDetach(std::uint64_t nowMs) {
