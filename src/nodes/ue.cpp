@@ -39,7 +39,7 @@ void Ue::startAttach(std::uint64_t nowMs) {
             nowMs
         );
         // 3. Encode it using FrameCodec.
-        std::vector<std::uint8_t> encoded_msg = FrameCodec().encode(msg); 
+        std::vector<std::uint8_t> encoded_msg = FrameCodec::encode(msg); 
         // 4. Push a control-plane datagram to outgoing_.
         Datagram datagram = Datagram{};
         
