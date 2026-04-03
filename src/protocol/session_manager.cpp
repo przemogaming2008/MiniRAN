@@ -32,9 +32,18 @@ bool SessionManager::beginAttach(std::uint64_t nowMs) {
     (void)nowMs;
     // TODO(student):
     // 1. Allow transition Idle/Released -> Attaching.
-    // 2. Reset attach retry counter.
-    // 3. Remember the time of the control transmission.
-    // 4. Return true only when a new AttachRequest should be sent.
+    if( state_ == SessionState::Idle || state_ == SessionState::Released ){
+
+        state_ = SessionState::Attaching;
+
+        // 2. Reset attach retry counter.
+        attachRetryCount_= 0;
+        // 3. Remember the time of the control transmission.
+        lastControlTxMs_ = nowMs;
+        // 4. Return true only when a new AttachRequest should be sent.
+        return true;
+    }
+    
     return false;
 }
 
