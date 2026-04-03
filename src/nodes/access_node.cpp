@@ -28,17 +28,94 @@ void AccessNode::tick(std::uint64_t nowMs) {
 }
 
 void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
-    (void)datagram;
-    (void)nowMs;
+    // (void)datagram;
+    // (void)nowMs;
     // TODO(student):
     // 1. Decode datagram bytes using FrameCodec.
-    // 2. Route messages by type:
-    //    - AttachRequest  -> coreNetwork_.handleAttachRequest()
-    //    - Heartbeat      -> coreNetwork_.handleHeartbeat()
-    //    - Data           -> coreNetwork_.handleData()
-    //    - DetachRequest  -> coreNetwork_.handleDetachRequest()
-    // 3. For responses produced by CoreNetwork, encode them and queue a reply datagram to UE.
+    std::string error;
+    std::optional<ProtocolMessage> decode_opt = FrameCodec::decode(datagram.bytes,error);
+
+    if(decode_opt){
+        ProtocolMessage protocolMessage = *decode_opt;
+        // 2. Route messages by type:
+        //    - AttachRequest  -> coreNetwork_.handleAttachRequest()
+        //    - Heartbeat      -> coreNetwork_.handleHeartbeat()
+        //    - Data           -> coreNetwork_.handleData()
+        //    - DetachRequest  -> coreNetwork_.handleDetachRequest()
+        if(protocolMessage.header.messageType == MessageType::AttachRequest){
+            std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleAttachRequest(protocolMessage,nowMs);
+            if(msg_opt){
+                // 3. For responses produced by CoreNetwork, encode them and queue a reply datagram to UE.
+                ProtocolMessage msg = *msg_opt;
+                std::vector<std::uint8_t> encode_msg = FrameCodec::encode(msg);
+                Datagram datagram = Datagram{};
+                datagram.fromNodeId = nodeId_;
+                datagram.toNodeId = ueNodeId_;
+                datagram.enqueueTimeMs = nowMs;
+                datagram.controlPlane = true;
+                datagram.bytes = encode_msg;
+                outgoing_.push_back(datagram);
+                return;
+            }else{
+                //no answer from core
+                return;
+            }
+        }else if(protocolMessage.header.messageType == MessageType::Heartbeat){
+            std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleHeartbeat(protocolMessage,nowMs);
+            if(msg_opt){
+                // 3. For responses produced by CoreNetwork, encode them and queue a reply datagram to UE.
+                ProtocolMessage msg = *msg_opt;
+                std::vector<std::uint8_t> encode_msg = FrameCodec::encode(msg);
+                Datagram datagram = Datagram{};
+                datagram.fromNodeId = nodeId_;
+                datagram.toNodeId = ueNodeId_;
+                datagram.enqueueTimeMs = nowMs;
+                datagram.controlPlane = true;
+                datagram.bytes = encode_msg;
+                outgoing_.push_back(datagram);
+                return;
+            }else{
+                //no answer from core
+                return;
+            }
+        }else if(protocolMessage.header.messageType == MessageType::Data){
+            coreNetwork_.handleData(protocolMessage,nowMs);
+            return;
+
+        }else if(protocolMessage.header.messageType == MessageType::DetachRequest){
+            std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleDetachRequest(protocolMessage,nowMs);
+            if(msg_opt){
+                // 3. For responses produced by CoreNetwork, encode them and queue a reply datagram to UE.
+                ProtocolMessage msg = *msg_opt;
+                std::vector<std::uint8_t> encode_msg = FrameCodec::encode(msg);
+                Datagram datagram = Datagram{};
+                datagram.fromNodeId = nodeId_;
+                datagram.toNodeId = ueNodeId_;
+                datagram.enqueueTimeMs = nowMs;
+                datagram.controlPlane = true;
+                datagram.bytes = encode_msg;
+                outgoing_.push_back(datagram);
+                return;
+            }else{
+                //no answer from core
+                return;
+            }
+        }else{
+            //inappropriate header
+            //TO DO: send error?
+            return;
+        }
+        
+        
+
+    } else {
+        //message issue
+        //TO DO: send error?
+        return;
+    }
     // 4. Update AccessNode metrics when appropriate.
+    //TO DO
+    return;
 }
 
 std::vector<Datagram> AccessNode::flushOutgoing() {
