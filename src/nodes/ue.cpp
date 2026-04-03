@@ -1,0 +1,79 @@
+#include "miniran/nodes/ue.h"
+
+#include <string>
+
+#include "miniran/protocol/frame_codec.h"
+
+namespace miniran {
+
+Ue::Ue(std::uint32_t nodeId, std::uint32_t accessNodeId, TransportMode transportMode, SessionTimers timers)
+    : nodeId_(nodeId), accessNodeId_(accessNodeId), transportMode_(transportMode), sessionManager_(nodeId, timers) {}
+
+std::uint32_t Ue::nodeId() const {
+    return nodeId_;
+}
+
+SessionState Ue::state() const {
+    return sessionManager_.state();
+}
+
+bool Ue::isAttached() const {
+    return sessionManager_.isAttached();
+}
+
+const FlowMetrics& Ue::metrics() const {
+    return metrics_;
+}
+
+void Ue::startAttach(std::uint64_t nowMs) {
+    (void)nowMs;
+    // TODO(student):
+    // 1. Ask SessionManager if attach may start.
+    // 2. Create AttachRequest message.
+    // 3. Encode it using FrameCodec.
+    // 4. Push a control-plane datagram to outgoing_.
+}
+
+void Ue::startDetach(std::uint64_t nowMs) {
+    (void)nowMs;
+    // TODO(student):
+    // Build and queue DetachRequest when session is active.
+}
+
+void Ue::sendTraffic(const std::vector<std::uint8_t>& payload, std::uint64_t nowMs) {
+    (void)payload;
+    (void)nowMs;
+    // TODO(student):
+    // 1. Check if data can be sent.
+    // 2. Wrap payload into a Data message.
+    // 3. Update UE metrics_.
+    // 4. Push a user-plane datagram to outgoing_.
+}
+
+void Ue::tick(std::uint64_t nowMs) {
+    (void)nowMs;
+    // TODO(student):
+    // React to SessionManager::onTick().
+    // Possible actions: retransmit AttachRequest / DetachRequest / send Heartbeat.
+}
+
+void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
+    (void)datagram;
+    (void)nowMs;
+    // TODO(student):
+    // 1. Decode incoming bytes.
+    // 2. Handle AttachAccept / DetachAccept / HeartbeatAck / Error.
+    // 3. Update session state via SessionManager.
+}
+
+std::vector<Datagram> Ue::flushOutgoing() {
+    std::vector<Datagram> datagrams;
+    datagrams.reserve(outgoing_.size());
+    while (!outgoing_.empty()) {
+        datagrams.push_back(std::move(outgoing_.front()));
+        outgoing_.pop_front();
+    }
+    return datagrams;
+}
+
+}  // namespace miniran

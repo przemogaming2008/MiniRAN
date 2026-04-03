@@ -1,0 +1,96 @@
+#include "miniran/protocol/session_manager.h"
+
+namespace miniran {
+
+SessionManager::SessionManager(std::uint32_t ueId, SessionTimers timers) : ueId_(ueId), timers_(timers) {}
+
+std::uint32_t SessionManager::ueId() const {
+    return ueId_;
+}
+
+std::uint32_t SessionManager::sessionId() const {
+    return sessionId_;
+}
+
+SessionState SessionManager::state() const {
+    return state_;
+}
+
+bool SessionManager::isAttached() const {
+    return state_ == SessionState::Attached;
+}
+
+bool SessionManager::canSendData() const {
+    return isAttached();
+}
+
+std::uint32_t SessionManager::nextSequenceNumber() {
+    return nextSequenceNumber_++;
+}
+
+bool SessionManager::beginAttach(std::uint64_t nowMs) {
+    (void)nowMs;
+    // TODO(student):
+    // 1. Allow transition Idle/Released -> Attaching.
+    // 2. Reset attach retry counter.
+    // 3. Remember the time of the control transmission.
+    // 4. Return true only when a new AttachRequest should be sent.
+    return false;
+}
+
+bool SessionManager::onAttachAccepted(std::uint32_t sessionId, std::uint64_t nowMs) {
+    (void)sessionId;
+    (void)nowMs;
+    // TODO(student):
+    // 1. Accept the session only if the current state is Attaching.
+    // 2. Store the assigned session id.
+    // 3. Move to Attached.
+    // 4. Refresh activity timestamps.
+    return false;
+}
+
+bool SessionManager::beginDetach(std::uint64_t nowMs) {
+    (void)nowMs;
+    // TODO(student):
+    // 1. Allow transition Attached -> Detaching.
+    // 2. Reset detach retry counter.
+    // 3. Remember last control tx time.
+    return false;
+}
+
+bool SessionManager::onDetachAccepted(std::uint64_t nowMs) {
+    (void)nowMs;
+    // TODO(student):
+    // 1. Accept only if state is Detaching.
+    // 2. Move to Released.
+    // 3. Optionally clear session id or keep it for post-analysis.
+    return false;
+}
+
+void SessionManager::onHeartbeatResponse(std::uint64_t nowMs) {
+    // TODO(student):
+    // Update the last successful activity timestamp.
+    lastHeartbeatAckMs_ = nowMs;
+}
+
+RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
+    (void)nowMs;
+    // TODO(student):
+    // - If Attaching and timeout expired, request retransmission of AttachRequest.
+    // - If Detaching and timeout expired, request retransmission of DetachRequest.
+    // - If retries are exhausted, decide whether to move to Rejected/Released.
+    // - If Attached and heartbeat interval elapsed, you may also request a Heartbeat.
+    return {};
+}
+
+void SessionManager::reset() {
+    state_ = SessionState::Idle;
+    sessionId_ = 0;
+    nextSequenceNumber_ = 1;
+    lastControlTxMs_ = 0;
+    lastHeartbeatAckMs_ = 0;
+    attachRetryCount_ = 0;
+    detachRetryCount_ = 0;
+}
+
+}  // namespace miniran
