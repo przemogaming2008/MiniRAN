@@ -78,12 +78,34 @@ void Ue::tick(std::uint64_t nowMs) {
 }
 
 void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
-    (void)datagram;
-    (void)nowMs;
+    // (void)datagram;
+    // (void)nowMs;
     // TODO(student):
     // 1. Decode incoming bytes.
+    std::string error;
+    std::optional<ProtocolMessage> protocolMessage_opt= FrameCodec::decode(datagram.bytes, error);
     // 2. Handle AttachAccept / DetachAccept / HeartbeatAck / Error.
-    // 3. Update session state via SessionManager.
+    if(protocolMessage_opt){
+        ProtocolMessage protocolMessage = *protocolMessage_opt;
+
+        if(protocolMessage.header.messageType == MessageType::AttachAccept){
+            // 3. Update session state via SessionManager. (inside SessionManager methods)
+            sessionManager_.onAttachAccepted(protocolMessage.header.sessionId,nowMs);
+        } else if (protocolMessage.header.messageType == MessageType::DetachAccept){
+            sessionManager_.onDetachAccepted(nowMs);
+        } else if (protocolMessage.header.messageType == MessageType::HeartbeatAck){
+            sessionManager_.onHeartbeatResponse(nowMs);
+        } else if (protocolMessage.header.messageType == MessageType::Error){
+            //error message type, to do?
+        } else {
+            //inapropriate messagetype
+        }
+
+    } else {
+        // opt, error
+    }
+
+    
 }
 
 std::vector<Datagram> Ue::flushOutgoing() {
