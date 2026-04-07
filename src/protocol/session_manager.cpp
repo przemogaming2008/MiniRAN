@@ -1,5 +1,4 @@
 #include "miniran/protocol/session_manager.h"
-
 namespace miniran {
 
 SessionManager::SessionManager(std::uint32_t ueId, SessionTimers timers) : ueId_(ueId), timers_(timers) {}
@@ -29,7 +28,7 @@ std::uint32_t SessionManager::nextSequenceNumber() {
 }
 
 bool SessionManager::beginAttach(std::uint64_t nowMs) {
-    (void)nowMs;
+    // (void)nowMs;
     // TODO(student):
     // 1. Allow transition Idle/Released -> Attaching.
     if( state_ == SessionState::Idle || state_ == SessionState::Released ){
@@ -48,14 +47,21 @@ bool SessionManager::beginAttach(std::uint64_t nowMs) {
 }
 
 bool SessionManager::onAttachAccepted(std::uint32_t sessionId, std::uint64_t nowMs) {
-    (void)sessionId;
-    (void)nowMs;
+    // (void)sessionId;
+    // (void)nowMs;
     // TODO(student):
     // 1. Accept the session only if the current state is Attaching.
+    if(state() != SessionState::Attaching){
+        return false;
+    }
     // 2. Store the assigned session id.
+    sessionId_ = sessionId;
     // 3. Move to Attached.
+    state_ = SessionState::Attached;
     // 4. Refresh activity timestamps.
-    return false;
+    lastControlTxMs_ = nowMs;
+    lastHeartbeatAckMs_ = nowMs;
+    return true;
 }
 
 bool SessionManager::beginDetach(std::uint64_t nowMs) {
