@@ -21,14 +21,49 @@ std::size_t CoreNetwork::activeSessionCount() const {
 }
 
 std::optional<ProtocolMessage> CoreNetwork::handleAttachRequest(const ProtocolMessage& request, std::uint64_t nowMs) {
-    (void)request;
-    (void)nowMs;
+    // (void)request;
+    //(void)nowMs;
     // TODO(student):
-    // 1. Allocate a new session id (or reuse the existing one if policy allows).
-    // 2. Create/update SessionRecord with state Attached.
-    // 3. Return AttachAccept with the session id.
     // 4. Optionally reject malformed requests using AttachReject or Error.
-    return std::nullopt;
+    if(request.header.messageType != MessageType::AttachRequest){
+        return std::nullopt;
+    }
+    // 1. Allocate a new session id (or reuse the existing one if policy allows).
+    std::uint32_t new_session_id = nextSessionId_;
+
+    ProtocolMessage protocolMessage = ProtocolMessage{};
+    protocolMessage.header.timestampMs = nowMs;
+    protocolMessage.header.ueId = request.header.ueId;
+    protocolMessage.header.sequenceNumber = request.header.sequenceNumber;
+
+    if(hasActiveSession(request.header.ueId)){
+        //REFRESH SESSION
+        for (auto& [sessionId, session] : sessions_) {
+            if (session.ueId == request.header.ueId &&
+                session.state == SessionState::Attached) {
+
+                session.lastSeenMs = nowMs;
+
+                protocolMessage.header.messageType = MessageType::AttachAccept;
+                protocolMessage.header.sessionId = session.sessionId;
+                return protocolMessage;
+            }
+    }
+    }
+    // 2. Create/update SessionRecord with state Attached.
+    SessionRecord sessionRecord = SessionRecord{};
+    sessionRecord.ueId = request.header.ueId;
+    sessionRecord.state = SessionState::Attached;
+    sessionRecord.sessionId = new_session_id;
+    sessionRecord.attachedAtMs = nowMs;
+    sessions_[new_session_id] = sessionRecord;
+    // 3. Return AttachAccept with the session id.
+    protocolMessage.header.messageType = MessageType::AttachAccept;
+    protocolMessage.header.sessionId = new_session_id;
+    
+    ++nextSessionId_; 
+    return protocolMessage;
+
 }
 
 std::optional<ProtocolMessage> CoreNetwork::handleDetachRequest(const ProtocolMessage& request, std::uint64_t nowMs) {
