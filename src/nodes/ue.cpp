@@ -55,9 +55,31 @@ void Ue::startAttach(std::uint64_t nowMs) {
 }
 
 void Ue::startDetach(std::uint64_t nowMs) {
-    (void)nowMs;
+    //(void)nowMs;
     // TODO(student):
     // Build and queue DetachRequest when session is active.
+    if (!sessionManager_.beginDetach(nowMs)) {
+        return;
+    }
+    
+    ProtocolMessage msg = makeMessage(
+            MessageType::DetachRequest,
+            sessionManager_.ueId(),
+            sessionManager_.sessionId(),
+            sessionManager_.nextSequenceNumber(),
+            nowMs
+        );
+    std::vector<std::uint8_t> encoded_msg = FrameCodec::encode(msg);
+
+    Datagram datagram = Datagram{};
+        
+        datagram.fromNodeId = nodeId_;
+        datagram.toNodeId = accessNodeId_ ;
+        datagram.enqueueTimeMs = nowMs;
+        datagram.controlPlane = true;
+        datagram.bytes = encoded_msg;
+
+        outgoing_.push_back(datagram);
 }
 
 void Ue::sendTraffic(const std::vector<std::uint8_t>& payload, std::uint64_t nowMs) {
