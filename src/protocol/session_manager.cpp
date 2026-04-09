@@ -81,12 +81,19 @@ bool SessionManager::beginDetach(std::uint64_t nowMs) {
 }
 
 bool SessionManager::onDetachAccepted(std::uint64_t nowMs) {
-    (void)nowMs;
+    //(void)nowMs;
     // TODO(student):
     // 1. Accept only if state is Detaching.
+    if(state() != SessionState::Detaching){
+        return false;
+    }
     // 2. Move to Released.
+    state_ = SessionState::Released;
     // 3. Optionally clear session id or keep it for post-analysis.
-    return false;
+    sessionId_ = 0;
+    lastControlTxMs_ = nowMs;
+    lastHeartbeatAckMs_ = nowMs;
+    return true;
 }
 
 void SessionManager::onHeartbeatResponse(std::uint64_t nowMs) {
