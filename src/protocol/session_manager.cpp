@@ -103,13 +103,47 @@ void SessionManager::onHeartbeatResponse(std::uint64_t nowMs) {
 }
 
 RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
-    (void)nowMs;
+    //(void)nowMs;
     // TODO(student):
     // - If Attaching and timeout expired, request retransmission of AttachRequest.
+    if(state_ == SessionState::Attaching && (nowMs - lastControlTxMs_) >= timers_.attachTimeoutMs){
+        if (attachRetryCount_ < timers_.maxAttachRetries) {
+            ++attachRetryCount_;
+            lastControlTxMs_ = nowMs;
+            return {true, MessageType::AttachRequest};
+        } else {
+            // - If retries are exhausted, decide whether to move to Rejected/Released.
+            state_ = SessionState::Rejected;
+            attachRetryCount_ = 0;
+            sessionId_ = 0;
+            return {};
+        }
+    }
     // - If Detaching and timeout expired, request retransmission of DetachRequest.
-    // - If retries are exhausted, decide whether to move to Rejected/Released.
+    if (state_ == SessionState::Detaching &&
+        (nowMs - lastControlTxMs_) >= timers_.detachTimeoutMs)
+    {
+        if (detachRetryCount_ < timers_.maxDetachRetries) {
+            ++detachRetryCount_;
+            lastControlTxMs_ = nowMs;
+            return {true, MessageType::DetachRequest};
+        } else {
+            state_ = SessionState::Released;
+            detachRetryCount_ = 0;
+            sessionId_ = 0;
+            return {};
+        }
+    }
     // - If Attached and heartbeat interval elapsed, you may also request a Heartbeat.
+    if (state_ == SessionState::Attached &&
+        (nowMs - lastControlTxMs_) >= timers_.heartbeatIntervalMs)
+    {
+        lastControlTxMs_ = nowMs;
+        return {true, MessageType::Heartbeat};
+    }
+
     return {};
+
 }
 
 void SessionManager::reset() {
