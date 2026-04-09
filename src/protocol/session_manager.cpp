@@ -65,11 +65,18 @@ bool SessionManager::onAttachAccepted(std::uint32_t sessionId, std::uint64_t now
 }
 
 bool SessionManager::beginDetach(std::uint64_t nowMs) {
-    (void)nowMs;
+    //(void)nowMs;
     // TODO(student):
     // 1. Allow transition Attached -> Detaching.
-    // 2. Reset detach retry counter.
-    // 3. Remember last control tx time.
+    if( state_ == SessionState::Attached){
+        state_ = SessionState::Detaching;
+        // 2. Reset detach retry counter.
+        detachRetryCount_ = 0;
+        // 3. Remember last control tx time.
+        lastControlTxMs_ = nowMs;
+        return true;
+    }
+    
     return false;
 }
 
