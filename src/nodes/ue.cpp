@@ -83,13 +83,34 @@ void Ue::startDetach(std::uint64_t nowMs) {
 }
 
 void Ue::sendTraffic(const std::vector<std::uint8_t>& payload, std::uint64_t nowMs) {
-    (void)payload;
-    (void)nowMs;
+    //(void)payload;
+    //(void)nowMs;
     // TODO(student):
     // 1. Check if data can be sent.
+    if(state() != SessionState::Attached){
+        return;
+    }
     // 2. Wrap payload into a Data message.
+    ProtocolMessage msg = makeMessage(
+        MessageType::Data,
+        sessionManager_.ueId(),
+        sessionManager_.sessionId(),
+        sessionManager_.nextSequenceNumber(),
+        nowMs,
+        payload
+    );
     // 3. Update UE metrics_.
+    metrics_.bytesSent += payload.size();
+    metrics_.packetsSent += 1;
     // 4. Push a user-plane datagram to outgoing_.
+    Datagram datagram{};  //datagram.controlPlane = false;
+    datagram.fromNodeId = nodeId_;
+    datagram.toNodeId = accessNodeId_;
+    datagram.enqueueTimeMs = nowMs;
+    
+    datagram.bytes = FrameCodec::encode(msg);
+
+    outgoing_.push_back(datagram);
 }
 
 void Ue::tick(std::uint64_t nowMs) {
