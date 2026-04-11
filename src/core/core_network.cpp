@@ -134,12 +134,29 @@ std::optional<ProtocolMessage> CoreNetwork::handleHeartbeat(const ProtocolMessag
 }
 
 void CoreNetwork::handleData(const ProtocolMessage& request, std::uint64_t nowMs) {
-    (void)request;
-    (void)nowMs;
+    //(void)request;
+    //(void)nowMs;
     // TODO(student):
+    if (request.header.messageType != MessageType::Data) {
+        return;
+    }
+    auto it = sessions_.find(request.header.sessionId);
+    if (it == sessions_.end()) {
+        return;
+    }
+    SessionRecord& session = it->second;
     // 1. Accept data only for active sessions.
+    if (session.state != SessionState::Attached) {
+        //not attached, ignore
+        return;
+    }
     // 2. Count delivered bytes and packets.
+    session.deliveredBytes += request.header.payloadLength;
+    session.deliveredPackets += 1;
+    deliveredBytes_ += request.header.payloadLength;
+    deliveredPackets_ += 1;
     // 3. Refresh lastSeenMs for the session.
+    session.lastSeenMs = nowMs;
 }
 
 void CoreNetwork::expireInactiveSessions(std::uint64_t nowMs) {
