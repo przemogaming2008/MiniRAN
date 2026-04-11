@@ -109,13 +109,11 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
     if(state_ == SessionState::Attaching && (nowMs - lastControlTxMs_) >= timers_.attachTimeoutMs){
         if (attachRetryCount_ < timers_.maxAttachRetries) {
             ++attachRetryCount_;
-            lastControlTxMs_ = nowMs;
             return {true, MessageType::AttachRequest};
         } else {
             // - If retries are exhausted, decide whether to move to Rejected/Released.
             state_ = SessionState::Rejected;
             attachRetryCount_ = 0;
-            sessionId_ = 0;
             return {};
         }
     }
@@ -125,12 +123,10 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
     {
         if (detachRetryCount_ < timers_.maxDetachRetries) {
             ++detachRetryCount_;
-            lastControlTxMs_ = nowMs;
             return {true, MessageType::DetachRequest};
         } else {
-            state_ = SessionState::Released;
+            state_ = SessionState::Attached;
             detachRetryCount_ = 0;
-            sessionId_ = 0;
             return {};
         }
     }
@@ -138,7 +134,6 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
     if (state_ == SessionState::Attached &&
         (nowMs - lastControlTxMs_) >= timers_.heartbeatIntervalMs)
     {
-        lastControlTxMs_ = nowMs;
         return {true, MessageType::Heartbeat};
     }
 
