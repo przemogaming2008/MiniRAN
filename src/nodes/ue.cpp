@@ -93,10 +93,62 @@ void Ue::sendTraffic(const std::vector<std::uint8_t>& payload, std::uint64_t now
 }
 
 void Ue::tick(std::uint64_t nowMs) {
-    (void)nowMs;
+    //(void)nowMs;
     // TODO(student):
     // React to SessionManager::onTick().
     // Possible actions: retransmit AttachRequest / DetachRequest / send Heartbeat.
+    ///////////////DO ZROBVIENIA!!!!
+    RetryDecision decision = sessionManager_.onTick(nowMs);
+
+    if (!decision.shouldRetransmit) {
+        return;
+    }
+
+    std::vector<std::uint8_t> encoded_msg;
+    if (decision.messageType == MessageType::AttachRequest) {
+        ProtocolMessage msg = makeMessage(
+            MessageType::AttachRequest,
+            sessionManager_.ueId(),
+            sessionManager_.sessionId(),
+            sessionManager_.nextSequenceNumber(),
+            nowMs
+        );
+        encoded_msg = FrameCodec::encode(msg); 
+    }
+
+    else if (decision.messageType == MessageType::DetachRequest) {
+        ProtocolMessage msg = makeMessage(
+            MessageType::DetachRequest,
+            sessionManager_.ueId(),
+            sessionManager_.sessionId(),
+            sessionManager_.nextSequenceNumber(),
+            nowMs
+        );
+        encoded_msg = FrameCodec::encode(msg); 
+    }
+
+    else if (decision.messageType == MessageType::Heartbeat) {
+        ProtocolMessage msg = makeMessage(
+            MessageType::Heartbeat,
+            sessionManager_.ueId(),
+            sessionManager_.sessionId(),
+            sessionManager_.nextSequenceNumber(),
+            nowMs
+        );
+        encoded_msg = FrameCodec::encode(msg); 
+    }
+    else {
+        return;
+    } 
+    Datagram datagram = Datagram{};
+    
+    datagram.fromNodeId = nodeId_;
+    datagram.toNodeId = accessNodeId_ ;
+    datagram.enqueueTimeMs = nowMs;
+    datagram.controlPlane = true;
+    datagram.bytes = encoded_msg;
+
+    outgoing_.push_back(datagram);
 }
 
 void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
