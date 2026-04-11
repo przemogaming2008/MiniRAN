@@ -116,9 +116,17 @@ void CoreNetwork::handleData(const ProtocolMessage& request, std::uint64_t nowMs
 }
 
 void CoreNetwork::expireInactiveSessions(std::uint64_t nowMs) {
-    (void)nowMs;
+    //(void)nowMs;
     // TODO(student):
     // Remove or close sessions that exceeded inactivity timeout.
+    for (auto it = sessions_.begin(); it != sessions_.end(); ) {
+        if( (nowMs-(it->second).lastSeenMs) >= timers_.inactivityTimeoutMs ) {
+            it = sessions_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
 }
 
 std::size_t CoreNetwork::deliveredBytes() const {
