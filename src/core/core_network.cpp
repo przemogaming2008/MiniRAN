@@ -99,11 +99,38 @@ std::optional<ProtocolMessage> CoreNetwork::handleDetachRequest(const ProtocolMe
 }
 
 std::optional<ProtocolMessage> CoreNetwork::handleHeartbeat(const ProtocolMessage& request, std::uint64_t nowMs) {
-    (void)request;
-    (void)nowMs;
+    //(void)request;
+    //(void)nowMs;
     // TODO(student):
     // Refresh lastSeenMs and reply with HeartbeatAck.
-    return std::nullopt;
+    if (request.header.messageType != MessageType::Heartbeat) {
+        return std::nullopt;
+    }
+
+    auto it = sessions_.find(request.header.sessionId);
+    if (it == sessions_.end()) {
+        //session not found, ignore
+        return std::nullopt;
+    }
+
+    SessionRecord& session = it->second;
+
+    if (session.state != SessionState::Attached) {
+        //not attached, ignore
+        return std::nullopt;
+    }
+
+    session.lastSeenMs = nowMs;
+
+    ProtocolMessage msg = makeMessage(
+        MessageType::HeartbeatAck,
+        request.header.ueId,
+        request.header.sessionId,
+        request.header.sequenceNumber,
+        nowMs
+    );
+
+    return msg;
 }
 
 void CoreNetwork::handleData(const ProtocolMessage& request, std::uint64_t nowMs) {
