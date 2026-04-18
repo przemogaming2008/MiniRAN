@@ -90,7 +90,7 @@ std::optional<ProtocolMessage> CoreNetwork::handleDetachRequest(const ProtocolMe
         protocolMessage.header.messageType = MessageType::DetachAccept;
         return protocolMessage;
     } else {
-        protocolMessage.header.messageType = MessageType::Error;
+        protocolMessage.header.messageType = MessageType::DetachAccept;
         return protocolMessage;
     }
 
