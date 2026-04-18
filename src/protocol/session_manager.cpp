@@ -31,7 +31,9 @@ bool SessionManager::beginAttach(std::uint64_t nowMs) {
     // (void)nowMs;
     // TODO(student):
     // 1. Allow transition Idle/Released -> Attaching.
-    if( state_ == SessionState::Idle || state_ == SessionState::Released ){
+
+    // Allow re-attach after a previously rejected/failed attach attempt.
+    if( state_ == SessionState::Idle || state_ == SessionState::Released || state_ == SessionState::Rejected){
 
         state_ = SessionState::Attaching;
 
