@@ -38,17 +38,13 @@ std::optional<ProtocolMessage> CoreNetwork::handleAttachRequest(const ProtocolMe
 
     if(hasActiveSession(request.header.ueId)){
         //REFRESH SESSION
-        for (auto& [sessionId, session] : sessions_) {
-            if (session.ueId == request.header.ueId &&
-                session.state == SessionState::Attached) {
+        auto& session = sessions_[request.header.ueId];
 
-                session.lastSeenMs = nowMs;
+        session.lastSeenMs = nowMs;
 
-                protocolMessage.header.messageType = MessageType::AttachAccept;
-                protocolMessage.header.sessionId = session.sessionId;
-                return protocolMessage;
-            }
-    }
+        protocolMessage.header.messageType = MessageType::AttachAccept;
+        protocolMessage.header.sessionId = session.sessionId;
+        return protocolMessage;
     }
     // 2. Create/update SessionRecord with state Attached.
     SessionRecord sessionRecord = SessionRecord{};
@@ -56,7 +52,9 @@ std::optional<ProtocolMessage> CoreNetwork::handleAttachRequest(const ProtocolMe
     sessionRecord.state = SessionState::Attached;
     sessionRecord.sessionId = new_session_id;
     sessionRecord.attachedAtMs = nowMs;
-    sessions_[new_session_id] = sessionRecord;
+    sessionRecord.lastSeenMs = nowMs;
+
+    sessions_[request.header.ueId] = sessionRecord;
     // 3. Return AttachAccept with the session id.
     protocolMessage.header.messageType = MessageType::AttachAccept;
     protocolMessage.header.sessionId = new_session_id;
@@ -74,19 +72,19 @@ std::optional<ProtocolMessage> CoreNetwork::handleDetachRequest(const ProtocolMe
         return std::nullopt;
     }
     // 1. Find the UE session.
-    std::uint32_t sessionId = request.header.sessionId;
+    std::uint32_t ueId = request.header.ueId;
 
     ProtocolMessage protocolMessage = ProtocolMessage{};
     protocolMessage.header.timestampMs = nowMs;
     protocolMessage.header.ueId = request.header.ueId;
     protocolMessage.header.sequenceNumber = request.header.sequenceNumber;
     
-    protocolMessage.header.sessionId = sessionId;
+    protocolMessage.header.sessionId = request.header.sessionId;
     
-    auto it = sessions_.find(sessionId);
+    auto it = sessions_.find(ueId);
     if (it != sessions_.end()) {
         // 2. Mark it Released or remove it.
-        sessions_.erase(sessionId);
+        sessions_.erase(ueId);
 
          // 3. Return DetachAccept when successful.
         protocolMessage.header.messageType = MessageType::DetachAccept;
@@ -107,7 +105,7 @@ std::optional<ProtocolMessage> CoreNetwork::handleHeartbeat(const ProtocolMessag
         return std::nullopt;
     }
 
-    auto it = sessions_.find(request.header.sessionId);
+    auto it = sessions_.find(request.header.ueId);
     if (it == sessions_.end()) {
         //session not found, ignore
         return std::nullopt;
@@ -125,7 +123,7 @@ std::optional<ProtocolMessage> CoreNetwork::handleHeartbeat(const ProtocolMessag
     ProtocolMessage msg = makeMessage(
         MessageType::HeartbeatAck,
         request.header.ueId,
-        request.header.sessionId,
+        session.sessionId,
         request.header.sequenceNumber,
         nowMs
     );
@@ -140,7 +138,7 @@ void CoreNetwork::handleData(const ProtocolMessage& request, std::uint64_t nowMs
     if (request.header.messageType != MessageType::Data) {
         return;
     }
-    auto it = sessions_.find(request.header.sessionId);
+    auto it = sessions_.find(request.header.ueId);
     if (it == sessions_.end()) {
         return;
     }
