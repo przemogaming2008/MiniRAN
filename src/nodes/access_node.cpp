@@ -43,6 +43,8 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
         //    - Data           -> coreNetwork_.handleData()
         //    - DetachRequest  -> coreNetwork_.handleDetachRequest()
         if(protocolMessage.header.messageType == MessageType::AttachRequest){
+            metrics_.packetsDelivered += 1;
+            metrics_.bytesDelivered += datagram.bytes.size();
             std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleAttachRequest(protocolMessage,nowMs);
             if(msg_opt){
                 // 3. For responses produced by CoreNetwork, encode them and queue a reply datagram to UE.
@@ -54,6 +56,9 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
                 datagram.enqueueTimeMs = nowMs;
                 datagram.controlPlane = true;
                 datagram.bytes = encode_msg;
+
+                metrics_.packetsSent += 1;
+                metrics_.bytesSent += datagram.bytes.size();
                 outgoing_.push_back(datagram);
                 return;
             }else{
@@ -61,6 +66,8 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
                 return;
             }
         }else if(protocolMessage.header.messageType == MessageType::Heartbeat){
+            metrics_.packetsDelivered += 1;
+            metrics_.bytesDelivered += datagram.bytes.size();
             std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleHeartbeat(protocolMessage,nowMs);
             if(msg_opt){
                 // 3. For responses produced by CoreNetwork, encode them and queue a reply datagram to UE.
@@ -72,6 +79,9 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
                 datagram.enqueueTimeMs = nowMs;
                 datagram.controlPlane = true;
                 datagram.bytes = encode_msg;
+
+                metrics_.packetsSent += 1;
+                metrics_.bytesSent += datagram.bytes.size();
                 outgoing_.push_back(datagram);
                 return;
             }else{
@@ -79,10 +89,14 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
                 return;
             }
         }else if(protocolMessage.header.messageType == MessageType::Data){
+            metrics_.packetsDelivered += 1;
+            metrics_.bytesDelivered += datagram.bytes.size();
             coreNetwork_.handleData(protocolMessage,nowMs);
             return;
 
         }else if(protocolMessage.header.messageType == MessageType::DetachRequest){
+            metrics_.packetsDelivered += 1;
+            metrics_.bytesDelivered += datagram.bytes.size();
             std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleDetachRequest(protocolMessage,nowMs);
             if(msg_opt){
                 // 3. For responses produced by CoreNetwork, encode them and queue a reply datagram to UE.
@@ -94,6 +108,9 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
                 datagram.enqueueTimeMs = nowMs;
                 datagram.controlPlane = true;
                 datagram.bytes = encode_msg;
+
+                metrics_.packetsSent += 1;
+                metrics_.bytesSent += datagram.bytes.size();    
                 outgoing_.push_back(datagram);
                 return;
             }else{
@@ -101,6 +118,7 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
                 return;
             }
         }else{
+            metrics_.packetsDropped += 1;
             //inappropriate header
             //TO DO: send error?
             return;
@@ -109,6 +127,7 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
         
 
     } else {
+        metrics_.packetsDropped += 1;
         //message issue
         //TO DO: send error?
         return;
