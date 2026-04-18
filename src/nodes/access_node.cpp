@@ -43,6 +43,7 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
         //    - Data           -> coreNetwork_.handleData()
         //    - DetachRequest  -> coreNetwork_.handleDetachRequest()
         if(protocolMessage.header.messageType == MessageType::AttachRequest){
+            // 4. Update AccessNode metrics when appropriate.
             metrics_.packetsDelivered += 1;
             metrics_.bytesDelivered += datagram.bytes.size();
             std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleAttachRequest(protocolMessage,nowMs);
@@ -120,8 +121,29 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
         }else{
             metrics_.packetsDropped += 1;
             //inappropriate header
-            //TO DO: send error?
+            //Unsupported message type: send Error response
+            ProtocolMessage msg = ProtocolMessage{};
+            msg.header.messageType = MessageType::Error;
+            msg.header.ueId = protocolMessage.header.ueId;
+            msg.header.sessionId = protocolMessage.header.sessionId;
+            msg.header.sequenceNumber = protocolMessage.header.sequenceNumber;
+            msg.header.timestampMs = nowMs;
+
+            std::vector<std::uint8_t> encoded = FrameCodec::encode(msg);
+
+            Datagram response{};
+            response.fromNodeId = nodeId_;
+            response.toNodeId = ueNodeId_;
+            response.enqueueTimeMs = nowMs;
+            response.controlPlane = true;
+            response.bytes = encoded;
+
+            metrics_.packetsSent += 1;
+            metrics_.bytesSent += response.bytes.size();
+
+            outgoing_.push_back(response);
             return;
+
         }
         
         
@@ -129,11 +151,10 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
     } else {
         metrics_.packetsDropped += 1;
         //message issue
-        //TO DO: send error?
+        //Malformed frame: drop silently
         return;
     }
-    // 4. Update AccessNode metrics when appropriate.
-    //TO DO
+    
     return;
 }
 
