@@ -38,6 +38,7 @@ if(MINIRAN_BUILD_TESTS)
         tests/unit/test_virtual_network.cpp
         tests/unit/test_session_manager.cpp
         tests/unit/test_duplicate_attach_request.cpp
+        tests/unit/test_data_after_detach.cpp
 
         tests/component/test_attach_detach.cpp
         tests/component/test_tcp_traffic.cpp
