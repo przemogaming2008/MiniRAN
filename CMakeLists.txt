@@ -42,6 +42,7 @@ if(MINIRAN_BUILD_TESTS)
         tests/unit/test_detach_after_session_expiration.cpp
         tests/unit/test_reattach_after_released.cpp
         tests/unit/test_detach_in_invalid_states.cpp
+        tests/unit/test_data_after_session_expiration.cpp
 
         tests/component/test_attach_detach.cpp
         tests/component/test_tcp_traffic.cpp
