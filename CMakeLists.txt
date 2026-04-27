@@ -47,6 +47,8 @@ if(MINIRAN_BUILD_TESTS)
         tests/component/test_attach_detach.cpp
         tests/component/test_tcp_traffic.cpp
         tests/component/test_udp_stability.cpp
+        tests/component/test_udp_higher_loss.cpp
+        tests/component/test_udp_low_bandwidth_limits_throughput.cpp
     )
     target_link_libraries(miniran_tests PRIVATE miniran_lib)
     target_include_directories(miniran_tests PRIVATE tests)
