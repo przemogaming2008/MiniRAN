@@ -99,7 +99,13 @@ SimulationResult ScenarioRunner::run() {
 
     result.detachSucceeded = !ue.isAttached() && accessNode.coreNetwork().activeSessionCount() == 0;
     if (!result.detachSucceeded) {
-        result.notes.push_back("Detach phase did not close the session cleanly.");
+         if (!ue.isAttached() && accessNode.coreNetwork().activeSessionCount() > 0) {
+        result.notes.push_back(
+            "UE left Attached state, but CoreNetwork still has an active session."
+        );
+        } else {
+            result.notes.push_back("Detach phase did not close the session cleanly.");
+        }
     }
 
     result.totalDurationMs = nowMs;
