@@ -28,6 +28,17 @@ std::optional<ProtocolMessage> CoreNetwork::handleAttachRequest(const ProtocolMe
     if(request.header.messageType != MessageType::AttachRequest){
         return std::nullopt;
     }
+    if (request.header.ueId == 0 ||
+        request.header.sequenceNumber == 0 ||
+        request.header.sessionId != 0) {
+        ProtocolMessage protocolMessage{};
+        protocolMessage.header.timestampMs = nowMs;
+        protocolMessage.header.ueId = request.header.ueId;
+        protocolMessage.header.sequenceNumber = request.header.sequenceNumber;
+        protocolMessage.header.sessionId = request.header.sessionId;
+        protocolMessage.header.messageType = MessageType::Error;
+        return protocolMessage;
+    }
     // 1. Allocate a new session id (or reuse the existing one if policy allows).
     std::uint32_t new_session_id = nextSessionId_;
 
