@@ -87,7 +87,7 @@ void Ue::sendTraffic(const std::vector<std::uint8_t>& payload, std::uint64_t now
     //(void)nowMs;
     // TODO(student):
     // 1. Check if data can be sent.
-    if(state() != SessionState::Attached){
+    if(!sessionManager_.canSendData()){
         return;
     }
     // 2. Wrap payload into a Data message.
