@@ -38,6 +38,9 @@ AccessNode currently supports a single UE and always sends responses to ueNodeId
 
 Malformed frames are dropped silently by AccessNode. No Error response is generated because message metadata may be unavailable after failed decoding.
 
+AccessNode operates at the transport/frame level,
+while CoreNetwork operates at the protocol/user-data level.
+
 ## Expected initial status
 
 After extracting the template and building it:
