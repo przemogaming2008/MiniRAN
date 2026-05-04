@@ -118,7 +118,6 @@ void Ue::tick(std::uint64_t nowMs) {
     // TODO(student):
     // React to SessionManager::onTick().
     // Possible actions: retransmit AttachRequest / DetachRequest / send Heartbeat.
-    ///////////////DO ZROBVIENIA!!!!
     RetryDecision decision = sessionManager_.onTick(nowMs);
 
     if (!decision.shouldRetransmit) {
@@ -169,6 +168,9 @@ void Ue::tick(std::uint64_t nowMs) {
     datagram.controlPlane = true;
     datagram.bytes = encoded_msg;
 
+    metrics_.packetsSent += 1;
+    metrics_.bytesSent += datagram.bytes.size();
+    
     outgoing_.push_back(datagram);
 }
 
