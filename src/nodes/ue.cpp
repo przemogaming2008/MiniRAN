@@ -183,12 +183,22 @@ void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
     if(protocolMessage_opt){
         ProtocolMessage protocolMessage = *protocolMessage_opt;
 
+        if (protocolMessage.header.ueId != nodeId()) {
+            return;
+        }
+
         if(protocolMessage.header.messageType == MessageType::AttachAccept){
             // 3. Update session state via SessionManager. (inside SessionManager methods)
             sessionManager_.onAttachAccepted(protocolMessage.header.sessionId,nowMs);
         } else if (protocolMessage.header.messageType == MessageType::DetachAccept){
+            if (protocolMessage.header.sessionId != sessionManager_.sessionId()) {
+                return;
+            }
             sessionManager_.onDetachAccepted(nowMs);
         } else if (protocolMessage.header.messageType == MessageType::HeartbeatAck){
+            if (protocolMessage.header.sessionId != sessionManager_.sessionId()) {
+                return;
+            }
             sessionManager_.onHeartbeatResponse(nowMs);
         } else if (protocolMessage.header.messageType == MessageType::Error){
             //error message type, to do?
@@ -199,8 +209,6 @@ void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
     } else {
         // opt, error
     }
-
-    
 }
 
 std::vector<Datagram> Ue::flushOutgoing() {
