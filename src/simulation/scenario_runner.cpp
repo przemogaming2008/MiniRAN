@@ -64,6 +64,14 @@ SimulationResult ScenarioRunner::run() {
     result.attachSucceeded = ue.isAttached();
     if (!result.attachSucceeded) {
         result.notes.push_back("Attach phase ended without reaching Attached state.");
+        result.notes.push_back("Traffic and detach phases skipped because no session was established.");
+
+        result.totalDurationMs = nowMs;
+        result.finalUeState = ue.state();
+        result.packetsDroppedInNetwork = network.metrics().packetsDropped;
+        result.packetsDeliveredByNetwork = network.metrics().packetsDelivered;
+        result.activeSessionsAtEnd = accessNode.coreNetwork().activeSessionCount();
+        return result;
     }
 
     const std::uint64_t trafficStartMs = nowMs;
