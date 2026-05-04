@@ -41,6 +41,8 @@ Malformed frames are dropped silently by AccessNode. No Error response is genera
 AccessNode operates at the transport/frame level,
 while CoreNetwork operates at the protocol/user-data level.
 
+Throughput is averaged over trafficProfile.durationMs, not actual data delivery time.
+
 ## Expected initial status
 
 After extracting the template and building it:

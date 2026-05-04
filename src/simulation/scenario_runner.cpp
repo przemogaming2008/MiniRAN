@@ -42,7 +42,7 @@ SimulationResult ScenarioRunner::run() {
 
     TrafficGenerator generator(config_.trafficProfile, 7);
     const auto trafficEvents = generator.generate();
-    result.trafficStarted = !trafficEvents.empty();
+    result.trafficStarted = false;
     result.packetsGenerated = trafficEvents.size();
     for (const auto& event : trafficEvents) {
         result.bytesGenerated += event.payload.size();
@@ -78,6 +78,9 @@ SimulationResult ScenarioRunner::run() {
     std::size_t eventIndex = 0;
     while (nowMs < trafficStartMs + config_.trafficProfile.durationMs) {
         while (eventIndex < trafficEvents.size() && trafficStartMs + trafficEvents[eventIndex].timestampMs <= nowMs) {
+            if (ue.isAttached()) {
+                result.trafficStarted = true;
+            }
             ue.sendTraffic(trafficEvents[eventIndex].payload, nowMs);
             ++eventIndex;
         }
