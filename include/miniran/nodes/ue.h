@@ -30,7 +30,7 @@ public:
 private:
     std::uint32_t nodeId_ = 0;
     std::uint32_t accessNodeId_ = 0;
-    TransportMode transportMode_ = TransportMode::Tcp;
+    
     SessionManager sessionManager_;
     FlowMetrics metrics_{};
     std::deque<Datagram> outgoing_;

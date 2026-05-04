@@ -7,7 +7,9 @@
 namespace miniran {
 
 Ue::Ue(std::uint32_t nodeId, std::uint32_t accessNodeId, TransportMode transportMode, SessionTimers timers)
-    : nodeId_(nodeId), accessNodeId_(accessNodeId), transportMode_(transportMode), sessionManager_(nodeId, timers) {}
+    : nodeId_(nodeId), accessNodeId_(accessNodeId), sessionManager_(nodeId, timers) {
+    (void)transportMode;
+}
 
 std::uint32_t Ue::nodeId() const {
     return nodeId_;
@@ -170,7 +172,7 @@ void Ue::tick(std::uint64_t nowMs) {
 
     metrics_.packetsSent += 1;
     metrics_.bytesSent += datagram.bytes.size();
-    
+
     outgoing_.push_back(datagram);
 }
 
