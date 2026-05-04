@@ -50,10 +50,24 @@ struct TrafficProfile {
     std::uint32_t rampEndPps = 20;
 
     bool isValid() const {
-        return durationMs > 0 && packetSizeBytes > 0 && burstIntervalMs > 0 && packetsPerSecond > 0 &&
-               rampStartPps > 0 && rampEndPps > 0;
+        if (durationMs == 0 || packetSizeBytes == 0) {
+            return false;
+        }
+
+        switch (pattern) {
+            case TrafficPattern::ConstantBitrate:
+                return packetsPerSecond > 0;
+
+            case TrafficPattern::Bursty:
+                return burstPackets > 0 && burstIntervalMs > 0;
+
+            case TrafficPattern::Ramp:
+                return rampStartPps > 0 && rampEndPps > 0;
+        }
+
+        return false;
     }
-};
+    };
 
 struct TrafficEvent {
     std::uint64_t timestampMs = 0;
