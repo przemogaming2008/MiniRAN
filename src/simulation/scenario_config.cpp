@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <unordered_map>
+#include <exception>
 
 namespace miniran {
 
@@ -55,27 +56,50 @@ std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, 
         values[key] = value;
     }
 
-    auto parseUnsigned = [&](const std::string& key, std::uint64_t& target) {
+    auto parseUnsigned = [&](const std::string& key, std::uint64_t& target) -> bool {
         if (const auto value = readValue(values, key)) {
-            target = std::stoull(*value);
+            try {
+                target = std::stoull(*value);
+            } catch (const std::exception&) {
+                error = "Invalid unsigned integer value for key: " + key;
+                return false;
+            }
         }
+        return true;
     };
-    auto parseUnsigned32 = [&](const std::string& key, std::uint32_t& target) {
+    auto parseUnsigned32 = [&](const std::string& key, std::uint32_t& target) -> bool {
         if (const auto value = readValue(values, key)) {
-            target = static_cast<std::uint32_t>(std::stoul(*value));
+            try {
+                target = static_cast<std::uint32_t>(std::stoul(*value));
+            } catch (const std::exception&) {
+                error = "Invalid uint32 value for key: " + key;
+                return false;
+            }
         }
+        return true;
     };
-    auto parseSize = [&](const std::string& key, std::size_t& target) {
+    auto parseSize = [&](const std::string& key, std::size_t& target) -> bool {
         if (const auto value = readValue(values, key)) {
-            target = static_cast<std::size_t>(std::stoull(*value));
+            try {
+                target = static_cast<std::size_t>(std::stoull(*value));
+            } catch (const std::exception&) {
+                error = "Invalid size value for key: " + key;
+                return false;
+            }
         }
+        return true;
     };
-    auto parseDouble = [&](const std::string& key, double& target) {
+    auto parseDouble = [&](const std::string& key, double& target) -> bool {
         if (const auto value = readValue(values, key)) {
-            target = std::stod(*value);
+            try {
+                target = std::stod(*value);
+            } catch (const std::exception&) {
+                error = "Invalid double value for key: " + key;
+                return false;
+            }
         }
+        return true;
     };
-
     ScenarioConfig config;
 
     if (const auto value = readValue(values, "scenario_name")) {
@@ -99,35 +123,33 @@ std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, 
         config.trafficProfile.pattern = *parsed;
     }
 
-    parseUnsigned32("ue_id", config.ueId);
-    parseUnsigned32("access_node_id", config.accessNodeId);
-    parseUnsigned("step_ms", config.stepMs);
-    parseUnsigned("attach_phase_budget_ms", config.attachPhaseBudgetMs);
-    parseUnsigned("detach_phase_budget_ms", config.detachPhaseBudgetMs);
+    if (!parseUnsigned32("ue_id", config.ueId)) return std::nullopt;
+    if (!parseUnsigned32("access_node_id", config.accessNodeId)) return std::nullopt;
+    if (!parseUnsigned("step_ms", config.stepMs)) return std::nullopt;
+    if (!parseUnsigned("attach_phase_budget_ms", config.attachPhaseBudgetMs)) return std::nullopt;
+    if (!parseUnsigned("detach_phase_budget_ms", config.detachPhaseBudgetMs)) return std::nullopt;
 
-    parseUnsigned32("attach_timeout_ms", config.timers.attachTimeoutMs);
-    parseUnsigned32("detach_timeout_ms", config.timers.detachTimeoutMs);
-    parseUnsigned32("heartbeat_interval_ms", config.timers.heartbeatIntervalMs);
-    parseUnsigned32("inactivity_timeout_ms", config.timers.inactivityTimeoutMs);
-    parseUnsigned32("max_attach_retries", config.timers.maxAttachRetries);
-    parseUnsigned32("max_detach_retries", config.timers.maxDetachRetries);
+    if (!parseUnsigned32("attach_timeout_ms", config.timers.attachTimeoutMs)) return std::nullopt;
+    if (!parseUnsigned32("detach_timeout_ms", config.timers.detachTimeoutMs)) return std::nullopt;
+    if (!parseUnsigned32("heartbeat_interval_ms", config.timers.heartbeatIntervalMs)) return std::nullopt;
+    if (!parseUnsigned32("inactivity_timeout_ms", config.timers.inactivityTimeoutMs)) return std::nullopt;
+    if (!parseUnsigned32("max_attach_retries", config.timers.maxAttachRetries)) return std::nullopt;
+    if (!parseUnsigned32("max_detach_retries", config.timers.maxDetachRetries)) return std::nullopt;
 
-    parseUnsigned32("latency_ms", config.linkProfile.latencyMs);
-    parseUnsigned32("jitter_ms", config.linkProfile.jitterMs);
-    parseDouble("loss_percent", config.linkProfile.lossPercent);
-    parseDouble("reorder_percent", config.linkProfile.reorderPercent);
-    if (const auto value = readValue(values, "bandwidth_kbps")) {
-        config.linkProfile.bandwidthKbps = std::stoull(*value);
-    }
-    parseSize("queue_limit_packets", config.linkProfile.queueLimitPackets);
+    if (!parseUnsigned32("latency_ms", config.linkProfile.latencyMs)) return std::nullopt;
+    if (!parseUnsigned32("jitter_ms", config.linkProfile.jitterMs)) return std::nullopt;
+    if (!parseDouble("loss_percent", config.linkProfile.lossPercent)) return std::nullopt;
+    if (!parseDouble("reorder_percent", config.linkProfile.reorderPercent)) return std::nullopt;
+    if (!parseUnsigned("bandwidth_kbps", config.linkProfile.bandwidthKbps)) return std::nullopt;
+    if (!parseSize("queue_limit_packets", config.linkProfile.queueLimitPackets)) return std::nullopt;
 
-    parseUnsigned("traffic_duration_ms", config.trafficProfile.durationMs);
-    parseSize("packet_size_bytes", config.trafficProfile.packetSizeBytes);
-    parseUnsigned32("packets_per_second", config.trafficProfile.packetsPerSecond);
-    parseUnsigned32("burst_packets", config.trafficProfile.burstPackets);
-    parseUnsigned32("burst_interval_ms", config.trafficProfile.burstIntervalMs);
-    parseUnsigned32("ramp_start_pps", config.trafficProfile.rampStartPps);
-    parseUnsigned32("ramp_end_pps", config.trafficProfile.rampEndPps);
+    if (!parseUnsigned("traffic_duration_ms", config.trafficProfile.durationMs)) return std::nullopt;
+    if (!parseSize("packet_size_bytes", config.trafficProfile.packetSizeBytes)) return std::nullopt;
+    if (!parseUnsigned32("packets_per_second", config.trafficProfile.packetsPerSecond)) return std::nullopt;
+    if (!parseUnsigned32("burst_packets", config.trafficProfile.burstPackets)) return std::nullopt;
+    if (!parseUnsigned32("burst_interval_ms", config.trafficProfile.burstIntervalMs)) return std::nullopt;
+    if (!parseUnsigned32("ramp_start_pps", config.trafficProfile.rampStartPps)) return std::nullopt;
+    if (!parseUnsigned32("ramp_end_pps", config.trafficProfile.rampEndPps)) return std::nullopt;
 
     if (!config.linkProfile.isValid()) {
         error = "Invalid LinkProfile values.";
