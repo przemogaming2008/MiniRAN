@@ -36,6 +36,8 @@ This is **not** a real 3GPP implementation. There is no real radio stack, NAS, N
 
 AccessNode currently supports a single UE and always sends responses to ueNodeId_. For multi-UE scenarios, responses should be routed based on datagram.fromNodeId instead.
 
+Malformed frames are dropped silently by AccessNode. No Error response is generated because message metadata may be unavailable after failed decoding.
+
 ## Expected initial status
 
 After extracting the template and building it:

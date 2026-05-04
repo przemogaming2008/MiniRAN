@@ -93,8 +93,7 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
 
     } else {
         metrics_.packetsDropped += 1;
-        //message issue
-        //Malformed frame: drop silently
+        // Malformed frames are dropped silently because no valid header exists to build a protocol-level Error response.
         return;
     }
     
