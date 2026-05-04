@@ -25,6 +25,8 @@ struct SimulationResult {
     double throughputMbps = 0.0;
     std::vector<std::string> notes;
 
+    std::uint64_t expiredSessions = 0;
+    
     std::string summary() const;
 };
 

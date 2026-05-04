@@ -120,6 +120,8 @@ SimulationResult ScenarioRunner::run() {
                                 : (static_cast<double>(result.bytesDeliveredToCore) * 8.0) /
                                       (static_cast<double>(config_.trafficProfile.durationMs) / 1000.0) / 1'000'000.0;
 
+    result.expiredSessions = accessNode.coreNetwork().expiredSessions();
+    
     if (result.bytesDeliveredToCore == 0) {
         result.notes.push_back("No user-plane payload reached the simplified core.");
     }

@@ -182,6 +182,7 @@ void CoreNetwork::expireInactiveSessions(std::uint64_t nowMs) {
     // Remove or close sessions that exceeded inactivity timeout.
     for (auto it = sessions_.begin(); it != sessions_.end(); ) {
         if( (nowMs-(it->second).lastSeenMs) >= timers_.inactivityTimeoutMs ) {
+            ++expiredSessions_;
             it = sessions_.erase(it);
         } else {
             ++it;

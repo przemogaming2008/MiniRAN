@@ -37,12 +37,17 @@ public:
     std::size_t deliveredPackets() const;
     const std::unordered_map<std::uint32_t, SessionRecord>& sessions() const;
 
+    std::uint64_t expiredSessions() const {
+        return expiredSessions_;
+    }
 private:
     SessionTimers timers_{};
     std::unordered_map<std::uint32_t, SessionRecord> sessions_;
     std::uint32_t nextSessionId_ = 1000;
     std::size_t deliveredBytes_ = 0;
     std::size_t deliveredPackets_ = 0;
+
+    std::uint64_t expiredSessions_ = 0;
 };
 
 }  // namespace miniran
