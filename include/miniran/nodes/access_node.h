@@ -24,6 +24,8 @@ public:
     std::vector<Datagram> flushOutgoing();
 
 private:
+    void queueResponseToUe(const ProtocolMessage& message, std::uint64_t nowMs);
+
     std::uint32_t nodeId_ = 0;
     std::uint32_t ueNodeId_ = 0;
     CoreNetwork coreNetwork_;

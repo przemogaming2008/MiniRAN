@@ -47,48 +47,18 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
             metrics_.packetsDelivered += 1;
             metrics_.bytesDelivered += datagram.bytes.size();
             std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleAttachRequest(protocolMessage,nowMs);
-            if(msg_opt){
-                // 3. For responses produced by CoreNetwork, encode them and queue a reply datagram to UE.
-                ProtocolMessage msg = *msg_opt;
-                std::vector<std::uint8_t> encode_msg = FrameCodec::encode(msg);
-                Datagram datagram = Datagram{};
-                datagram.fromNodeId = nodeId_;
-                datagram.toNodeId = ueNodeId_;
-                datagram.enqueueTimeMs = nowMs;
-                datagram.controlPlane = true;
-                datagram.bytes = encode_msg;
-
-                metrics_.packetsSent += 1;
-                metrics_.bytesSent += datagram.bytes.size();
-                outgoing_.push_back(datagram);
-                return;
-            }else{
-                //no answer from core
-                return;
+            if (msg_opt) {
+                queueResponseToUe(*msg_opt, nowMs);
             }
+            return;
         }else if(protocolMessage.header.messageType == MessageType::Heartbeat){
             metrics_.packetsDelivered += 1;
             metrics_.bytesDelivered += datagram.bytes.size();
             std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleHeartbeat(protocolMessage,nowMs);
-            if(msg_opt){
-                // 3. For responses produced by CoreNetwork, encode them and queue a reply datagram to UE.
-                ProtocolMessage msg = *msg_opt;
-                std::vector<std::uint8_t> encode_msg = FrameCodec::encode(msg);
-                Datagram datagram = Datagram{};
-                datagram.fromNodeId = nodeId_;
-                datagram.toNodeId = ueNodeId_;
-                datagram.enqueueTimeMs = nowMs;
-                datagram.controlPlane = true;
-                datagram.bytes = encode_msg;
-
-                metrics_.packetsSent += 1;
-                metrics_.bytesSent += datagram.bytes.size();
-                outgoing_.push_back(datagram);
-                return;
-            }else{
-                //no answer from core
-                return;
+            if (msg_opt) {
+                queueResponseToUe(*msg_opt, nowMs); 
             }
+            return;
         }else if(protocolMessage.header.messageType == MessageType::Data){
             metrics_.packetsDelivered += 1;
             metrics_.bytesDelivered += datagram.bytes.size();
@@ -99,25 +69,10 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
             metrics_.packetsDelivered += 1;
             metrics_.bytesDelivered += datagram.bytes.size();
             std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleDetachRequest(protocolMessage,nowMs);
-            if(msg_opt){
-                // 3. For responses produced by CoreNetwork, encode them and queue a reply datagram to UE.
-                ProtocolMessage msg = *msg_opt;
-                std::vector<std::uint8_t> encode_msg = FrameCodec::encode(msg);
-                Datagram datagram = Datagram{};
-                datagram.fromNodeId = nodeId_;
-                datagram.toNodeId = ueNodeId_;
-                datagram.enqueueTimeMs = nowMs;
-                datagram.controlPlane = true;
-                datagram.bytes = encode_msg;
-
-                metrics_.packetsSent += 1;
-                metrics_.bytesSent += datagram.bytes.size();    
-                outgoing_.push_back(datagram);
-                return;
-            }else{
-                //no answer from core
-                return;
+            if (msg_opt) {
+                queueResponseToUe(*msg_opt, nowMs);
             }
+            return;
         }else{
             metrics_.packetsDropped += 1;
             //inappropriate header
@@ -129,19 +84,7 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
             msg.header.sequenceNumber = protocolMessage.header.sequenceNumber;
             msg.header.timestampMs = nowMs;
 
-            std::vector<std::uint8_t> encoded = FrameCodec::encode(msg);
-
-            Datagram response{};
-            response.fromNodeId = nodeId_;
-            response.toNodeId = ueNodeId_;
-            response.enqueueTimeMs = nowMs;
-            response.controlPlane = true;
-            response.bytes = encoded;
-
-            metrics_.packetsSent += 1;
-            metrics_.bytesSent += response.bytes.size();
-
-            outgoing_.push_back(response);
+            queueResponseToUe(msg, nowMs);
             return;
 
         }
@@ -166,6 +109,22 @@ std::vector<Datagram> AccessNode::flushOutgoing() {
         outgoing_.pop_front();
     }
     return datagrams;
+}
+
+void AccessNode::queueResponseToUe(const ProtocolMessage& message, std::uint64_t nowMs) {
+    std::vector<std::uint8_t> encoded = FrameCodec::encode(message);
+
+    Datagram response{};
+    response.fromNodeId = nodeId_;
+    response.toNodeId = ueNodeId_;
+    response.enqueueTimeMs = nowMs;
+    response.controlPlane = true;
+    response.bytes = encoded;
+
+    metrics_.packetsSent += 1;
+    metrics_.bytesSent += response.bytes.size();
+
+    outgoing_.push_back(response);
 }
 
 }  // namespace miniran
