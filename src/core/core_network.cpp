@@ -72,28 +72,30 @@ std::optional<ProtocolMessage> CoreNetwork::handleDetachRequest(const ProtocolMe
         return std::nullopt;
     }
     // 1. Find the UE session.
-    std::uint32_t ueId = request.header.ueId;
 
     ProtocolMessage protocolMessage = ProtocolMessage{};
     protocolMessage.header.timestampMs = nowMs;
     protocolMessage.header.ueId = request.header.ueId;
     protocolMessage.header.sequenceNumber = request.header.sequenceNumber;
-    
+
     protocolMessage.header.sessionId = request.header.sessionId;
     
-    auto it = sessions_.find(ueId);
-    if (it != sessions_.end()) {
-        // 2. Mark it Released or remove it.
-        sessions_.erase(ueId);
+    auto it = sessions_.find(request.header.ueId);
 
-         // 3. Return DetachAccept when successful.
-        protocolMessage.header.messageType = MessageType::DetachAccept;
-        return protocolMessage;
-    } else {
+    if (it == sessions_.end()) {
         protocolMessage.header.messageType = MessageType::DetachAccept;
         return protocolMessage;
     }
 
+    if (it->second.sessionId != request.header.sessionId) {
+        protocolMessage.header.messageType = MessageType::Error;
+        return protocolMessage;
+    }
+
+    sessions_.erase(it);
+
+    protocolMessage.header.messageType = MessageType::DetachAccept;
+    return protocolMessage;
 }
 
 std::optional<ProtocolMessage> CoreNetwork::handleHeartbeat(const ProtocolMessage& request, std::uint64_t nowMs) {
