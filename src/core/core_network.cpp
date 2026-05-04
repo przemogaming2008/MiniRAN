@@ -164,10 +164,13 @@ void CoreNetwork::handleData(const ProtocolMessage& request, std::uint64_t nowMs
     if (request.header.sessionId != session.sessionId) {
         return;
     }
+    if (request.payload.size() != request.header.payloadLength) {
+        return;
+    }
     // 2. Count delivered bytes and packets.
-    session.deliveredBytes += request.header.payloadLength;
+    session.deliveredBytes += request.payload.size();
     session.deliveredPackets += 1;
-    deliveredBytes_ += request.header.payloadLength;
+    deliveredBytes_ += request.payload.size();
     deliveredPackets_ += 1;
     // 3. Refresh lastSeenMs for the session.
     session.lastSeenMs = nowMs;

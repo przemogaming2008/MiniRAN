@@ -25,7 +25,8 @@ TEST_CASE(data_after_detach){
     data.header.sequenceNumber = 2;
     data.header.payloadLength = 50;
     data.header.timestampMs = 110;
-
+    data.payload = std::vector<std::uint8_t>(50);
+    
     core.handleData(data, 110);
     ASSERT_EQ(core.deliveredPackets(), 1U);
     ASSERT_EQ(core.deliveredBytes(), 50U);
