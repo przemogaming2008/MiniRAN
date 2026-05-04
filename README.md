@@ -11,6 +11,7 @@ The project is inspired by the separation of **control plane** and **user plane*
 ## Why this template exists
 
 The template already gives the student:
+
 - a ready CMake project,
 - a message codec,
 - a virtual network with TCP/UDP-like behavior,
@@ -20,6 +21,7 @@ The template already gives the student:
 - scenario configuration files.
 
 The student must still implement the most important telecom logic:
+
 - session state machine,
 - UE behavior,
 - access node behavior,
@@ -32,9 +34,12 @@ The student must still implement the most important telecom logic:
 
 This is **not** a real 3GPP implementation. There is no real radio stack, NAS, NGAP, GTP-U, authentication, encryption or handover. The project is an **educational protocol laboratory**.
 
+AccessNode currently supports a single UE and always sends responses to ueNodeId_. For multi-UE scenarios, responses should be routed based on datagram.fromNodeId instead.
+
 ## Expected initial status
 
 After extracting the template and building it:
+
 - infrastructure code should compile,
 - some **unit tests pass immediately**,
 - the tests related to **session handling and end-to-end scenarios are expected to fail** until the student implements the missing logic.
@@ -93,6 +98,7 @@ scenarios/
 ## Ready files vs TODO files
 
 ### Mostly ready
+
 - `frame_codec.*`
 - `virtual_network.*`
 - `traffic_generator.*`
@@ -100,6 +106,7 @@ scenarios/
 - test infrastructure
 
 ### Main student work
+
 - `session_manager.*`
 - `core_network.*`
 - `access_node.*`
@@ -127,6 +134,7 @@ cmake --build build --target miniran_tests
 ## Final deliverable expected from the student
 
 A working implementation should:
+
 - attach a UE,
 - keep the session stable with heartbeat logic,
 - transfer simulated traffic,
