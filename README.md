@@ -43,6 +43,8 @@ while CoreNetwork operates at the protocol/user-data level.
 
 Throughput is averaged over trafficProfile.durationMs, not actual data delivery time.
 
+VirtualNetwork uses a simplified millisecond-based serialization delay model. Transmission time is estimated from frame size and bandwidth_kbps, so very small frames or high bandwidth values may produce coarse timing effects.
+
 ## Expected initial status
 
 After extracting the template and building it:
