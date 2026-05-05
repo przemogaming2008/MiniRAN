@@ -46,6 +46,8 @@ if(MINIRAN_BUILD_TESTS)
         tests/unit/test_data_with_wrong_session_id.cpp
         tests/unit/test_detach_with_wrong_session_id.cpp
         tests/unit/test_attach_validate.cpp
+        tests/unit/test_config_invalid_numeric_value.cpp
+        tests/unit/test_data_with_zero_length_payload.cpp
 
         tests/component/test_attach_detach.cpp
         tests/component/test_tcp_traffic.cpp
