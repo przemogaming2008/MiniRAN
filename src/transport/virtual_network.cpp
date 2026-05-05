@@ -15,17 +15,17 @@ bool VirtualNetwork::submit(Datagram datagram, std::uint64_t nowMs) {
     metrics_.packetsSent += 1;
     metrics_.bytesSent += datagram.bytes.size();
 
-    if (queue_.size() >= profile_.queueLimitPackets) {
-        metrics_.packetsDropped += 1;
-        return false;
-    }
-
     datagram.enqueueTimeMs = nowMs;
     datagram.serialNumber = serialCounter_++;
 
     if (profile_.mode == TransportMode::Udp && probability_(rng_) < profile_.lossPercent) {
         metrics_.packetsDropped += 1;
         return true;
+    }
+    
+    if (queue_.size() >= profile_.queueLimitPackets) {
+        metrics_.packetsDropped += 1;
+        return false;
     }
 
     const auto jitterRange = static_cast<int>(profile_.jitterMs);

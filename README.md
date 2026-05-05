@@ -45,6 +45,8 @@ Throughput is averaged over trafficProfile.durationMs, not actual data delivery 
 
 VirtualNetwork uses a simplified millisecond-based serialization delay model. Transmission time is estimated from frame size and bandwidth_kbps, so very small frames or high bandwidth values may produce coarse timing effects.
 
+Packets are dropped by UDP loss or queue overflow. Loss is applied first. `packetsDropped` aggregates all drop types.
+
 ## Expected initial status
 
 After extracting the template and building it:
