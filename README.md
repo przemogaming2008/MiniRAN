@@ -20,7 +20,7 @@ The template already gives the student:
 - initial unit tests and component tests,
 - scenario configuration files.
 
-The student must still implement the most important telecom logic:
+The student must still implement the most important telecom logic **ALREADY IMPLEMENTED**:
 
 - session state machine,
 - UE behavior,

@@ -21,10 +21,9 @@ std::size_t CoreNetwork::activeSessionCount() const {
 }
 
 std::optional<ProtocolMessage> CoreNetwork::handleAttachRequest(const ProtocolMessage& request, std::uint64_t nowMs) {
-    // (void)request;
-    //(void)nowMs;
-    // TODO(student):
-    // 4. Optionally reject malformed requests using AttachReject or Error.
+
+    
+    //Optionally reject malformed requests using AttachReject or Error.
     if(request.header.messageType != MessageType::AttachRequest){
         return std::nullopt;
     }
@@ -39,7 +38,7 @@ std::optional<ProtocolMessage> CoreNetwork::handleAttachRequest(const ProtocolMe
         protocolMessage.header.messageType = MessageType::Error;
         return protocolMessage;
     }
-    // 1. Allocate a new session id (or reuse the existing one if policy allows).
+    //Allocate a new session id for new sessions.
     std::uint32_t new_session_id = nextSessionId_;
 
     ProtocolMessage protocolMessage = ProtocolMessage{};
@@ -57,7 +56,7 @@ std::optional<ProtocolMessage> CoreNetwork::handleAttachRequest(const ProtocolMe
         protocolMessage.header.sessionId = session.sessionId;
         return protocolMessage;
     }
-    // 2. Create/update SessionRecord with state Attached.
+    //Create/update SessionRecord with state Attached.
     SessionRecord sessionRecord = SessionRecord{};
     sessionRecord.ueId = request.header.ueId;
     sessionRecord.state = SessionState::Attached;
@@ -66,7 +65,7 @@ std::optional<ProtocolMessage> CoreNetwork::handleAttachRequest(const ProtocolMe
     sessionRecord.lastSeenMs = nowMs;
 
     sessions_[request.header.ueId] = sessionRecord;
-    // 3. Return AttachAccept with the session id.
+    //Return AttachAccept with the session id.
     protocolMessage.header.messageType = MessageType::AttachAccept;
     protocolMessage.header.sessionId = new_session_id;
     
@@ -76,13 +75,11 @@ std::optional<ProtocolMessage> CoreNetwork::handleAttachRequest(const ProtocolMe
 }
 
 std::optional<ProtocolMessage> CoreNetwork::handleDetachRequest(const ProtocolMessage& request, std::uint64_t nowMs) {
-    // (void)request;
-    // (void)nowMs;
-    // TODO(student):
+
     if(request.header.messageType != MessageType::DetachRequest){
         return std::nullopt;
     }
-    // 1. Find the UE session.
+    //Find the UE session.
 
     ProtocolMessage protocolMessage = ProtocolMessage{};
     protocolMessage.header.timestampMs = nowMs;
@@ -110,10 +107,8 @@ std::optional<ProtocolMessage> CoreNetwork::handleDetachRequest(const ProtocolMe
 }
 
 std::optional<ProtocolMessage> CoreNetwork::handleHeartbeat(const ProtocolMessage& request, std::uint64_t nowMs) {
-    //(void)request;
-    //(void)nowMs;
-    // TODO(student):
-    // Refresh lastSeenMs and reply with HeartbeatAck.
+
+    //Refresh lastSeenMs and reply with HeartbeatAck.
     if (request.header.messageType != MessageType::Heartbeat) {
         return std::nullopt;
     }
@@ -145,9 +140,7 @@ std::optional<ProtocolMessage> CoreNetwork::handleHeartbeat(const ProtocolMessag
 }
 
 void CoreNetwork::handleData(const ProtocolMessage& request, std::uint64_t nowMs) {
-    //(void)request;
-    //(void)nowMs;
-    // TODO(student):
+
     if (request.header.messageType != MessageType::Data) {
         return;
     }
@@ -156,7 +149,7 @@ void CoreNetwork::handleData(const ProtocolMessage& request, std::uint64_t nowMs
         return;
     }
     SessionRecord& session = it->second;
-    // 1. Accept data only for active sessions.
+    //Accept data only for active sessions.
     if (session.state != SessionState::Attached) {
         //not attached, ignore
         return;
@@ -170,19 +163,18 @@ void CoreNetwork::handleData(const ProtocolMessage& request, std::uint64_t nowMs
     if (request.payload.empty()) {
         return;
     }
-    // 2. Count delivered bytes and packets.
+    //Count delivered bytes and packets.
     session.deliveredBytes += request.payload.size();
     session.deliveredPackets += 1;
     deliveredBytes_ += request.payload.size();
     deliveredPackets_ += 1;
-    // 3. Refresh lastSeenMs for the session.
+    //Refresh lastSeenMs for the session.
     session.lastSeenMs = nowMs;
 }
 
 void CoreNetwork::expireInactiveSessions(std::uint64_t nowMs) {
-    //(void)nowMs;
-    // TODO(student):
-    // Remove or close sessions that exceeded inactivity timeout.
+
+    //Remove sessions that exceeded inactivity timeout.
     for (auto it = sessions_.begin(); it != sessions_.end(); ) {
         if( (nowMs-(it->second).lastSeenMs) >= timers_.inactivityTimeoutMs ) {
             ++expiredSessions_;

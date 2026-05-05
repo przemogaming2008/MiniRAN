@@ -28,22 +28,20 @@ void AccessNode::tick(std::uint64_t nowMs) {
 }
 
 void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
-    // (void)datagram;
-    // (void)nowMs;
-    // TODO(student):
-    // 1. Decode datagram bytes using FrameCodec.
+
+    //Decode datagram bytes using FrameCodec.
     std::string error;
     std::optional<ProtocolMessage> decode_opt = FrameCodec::decode(datagram.bytes,error);
 
     if(decode_opt){
         ProtocolMessage protocolMessage = *decode_opt;
-        // 2. Route messages by type:
+        //Route messages by type:
         //    - AttachRequest  -> coreNetwork_.handleAttachRequest()
         //    - Heartbeat      -> coreNetwork_.handleHeartbeat()
         //    - Data           -> coreNetwork_.handleData()
         //    - DetachRequest  -> coreNetwork_.handleDetachRequest()
         if(protocolMessage.header.messageType == MessageType::AttachRequest){
-            // 4. Update AccessNode metrics when appropriate.
+            //Update AccessNode metrics when appropriate.
             metrics_.packetsDelivered += 1;
             metrics_.bytesDelivered += datagram.bytes.size();
             std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleAttachRequest(protocolMessage,nowMs);
@@ -93,7 +91,7 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
 
     } else {
         metrics_.packetsDropped += 1;
-        // Malformed frames are dropped silently because no valid header exists to build a protocol-level Error response.
+        //Malformed frames are dropped silently because no valid header exists to build a protocol-level Error response.
         return;
     }
     

@@ -28,11 +28,10 @@ const FlowMetrics& Ue::metrics() const {
 }
 
 void Ue::startAttach(std::uint64_t nowMs) {
-    //(void)nowMs;
-    // TODO(student):
-    // 1. Ask SessionManager if attach may start.
+
+    //Ask SessionManager if attach may start.
     if(sessionManager_.beginAttach(nowMs) == true){
-        // 2. Create AttachRequest message.
+        //Create AttachRequest message.
         ProtocolMessage msg = makeMessage(
             MessageType::AttachRequest,
             sessionManager_.ueId(),
@@ -40,9 +39,9 @@ void Ue::startAttach(std::uint64_t nowMs) {
             sessionManager_.nextSequenceNumber(),
             nowMs
         );
-        // 3. Encode it using FrameCodec.
+        //Encode it using FrameCodec.
         std::vector<std::uint8_t> encoded_msg = FrameCodec::encode(msg); 
-        // 4. Push a control-plane datagram to outgoing_.
+        //Push a control-plane datagram to outgoing_.
         Datagram datagram = Datagram{};
         
         datagram.fromNodeId = nodeId_;
@@ -57,9 +56,8 @@ void Ue::startAttach(std::uint64_t nowMs) {
 }
 
 void Ue::startDetach(std::uint64_t nowMs) {
-    //(void)nowMs;
-    // TODO(student):
-    // Build and queue DetachRequest when session is active.
+
+    //Build and queue DetachRequest when session is active.
     if (!sessionManager_.beginDetach(nowMs)) {
         return;
     }
@@ -85,14 +83,12 @@ void Ue::startDetach(std::uint64_t nowMs) {
 }
 
 void Ue::sendTraffic(const std::vector<std::uint8_t>& payload, std::uint64_t nowMs) {
-    //(void)payload;
-    //(void)nowMs;
-    // TODO(student):
-    // 1. Check if data can be sent.
+
+    //Check if data can be sent.
     if(!sessionManager_.canSendData()){
         return;
     }
-    // 2. Wrap payload into a Data message.
+    //Wrap payload into a Data message.
     ProtocolMessage msg = makeMessage(
         MessageType::Data,
         sessionManager_.ueId(),
@@ -101,10 +97,10 @@ void Ue::sendTraffic(const std::vector<std::uint8_t>& payload, std::uint64_t now
         nowMs,
         payload
     );
-    // 3. Update UE metrics_.
+    //Update UE metrics_.
     metrics_.bytesSent += payload.size();
     metrics_.packetsSent += 1;
-    // 4. Push a user-plane datagram to outgoing_.
+    //Push a user-plane datagram to outgoing_.
     Datagram datagram{};  //datagram.controlPlane = false;
     datagram.fromNodeId = nodeId_;
     datagram.toNodeId = accessNodeId_;
@@ -116,10 +112,9 @@ void Ue::sendTraffic(const std::vector<std::uint8_t>& payload, std::uint64_t now
 }
 
 void Ue::tick(std::uint64_t nowMs) {
-    //(void)nowMs;
-    // TODO(student):
-    // React to SessionManager::onTick().
-    // Possible actions: retransmit AttachRequest / DetachRequest / send Heartbeat.
+
+    //React to SessionManager::onTick().
+    //Possible actions: retransmit AttachRequest / DetachRequest / send Heartbeat.
     RetryDecision decision = sessionManager_.onTick(nowMs);
 
     if (!decision.shouldRetransmit) {
@@ -177,13 +172,11 @@ void Ue::tick(std::uint64_t nowMs) {
 }
 
 void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
-    // (void)datagram;
-    // (void)nowMs;
-    // TODO(student):
-    // 1. Decode incoming bytes.
+
+    //Decode incoming bytes.
     std::string error;
     std::optional<ProtocolMessage> protocolMessage_opt= FrameCodec::decode(datagram.bytes, error);
-    // 2. Handle AttachAccept / DetachAccept / HeartbeatAck / Error.
+    //Handle AttachAccept / DetachAccept / HeartbeatAck / Error.
     if(protocolMessage_opt){
         ProtocolMessage protocolMessage = *protocolMessage_opt;
 
@@ -192,7 +185,7 @@ void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
         }
 
         if(protocolMessage.header.messageType == MessageType::AttachAccept){
-            // 3. Update session state via SessionManager. (inside SessionManager methods)
+            //Update session state via SessionManager. (inside SessionManager methods)
             sessionManager_.onAttachAccepted(protocolMessage.header.sessionId,nowMs);
         } else if (protocolMessage.header.messageType == MessageType::DetachAccept){
             if (protocolMessage.header.sessionId != sessionManager_.sessionId()) {
@@ -211,7 +204,7 @@ void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
         }
 
     } else {
-        // opt, error
+        //opt, error
     }
 }
 
