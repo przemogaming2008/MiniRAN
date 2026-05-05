@@ -167,6 +167,9 @@ void CoreNetwork::handleData(const ProtocolMessage& request, std::uint64_t nowMs
     if (request.payload.size() != request.header.payloadLength) {
         return;
     }
+    if (request.payload.empty()) {
+        return;
+    }
     // 2. Count delivered bytes and packets.
     session.deliveredBytes += request.payload.size();
     session.deliveredPackets += 1;
