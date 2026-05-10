@@ -12,16 +12,21 @@ namespace miniran {
 struct ScenarioConfig {
     std::string scenarioName = "default";
     TransportMode transportMode = TransportMode::Tcp;
-    std::uint32_t ueId = 7;
     std::uint32_t accessNodeId = 1000;
     std::uint64_t stepMs = 10;
     std::uint64_t attachPhaseBudgetMs = 600;
     std::uint64_t detachPhaseBudgetMs = 600;
     SessionTimers timers{};
     LinkProfile linkProfile{};
-    TrafficProfile trafficProfile{};
+
+    std::vector<UeConfig> ueConfigs{{}};
 
     static std::optional<ScenarioConfig> fromFile(const std::string& path, std::string& error);
+};
+
+struct UeConfig {
+    std::uint32_t ueId = 7;
+    TrafficProfile trafficProfile{};
 };
 
 }  // namespace miniran

@@ -17,14 +17,27 @@ void submitOutgoing(VirtualNetwork& network, std::vector<Datagram> datagrams, st
     }
 }
 
-void deliverReady(VirtualNetwork& network, Ue& ue, AccessNode& accessNode, std::uint64_t nowMs) {
+void deliverReady(VirtualNetwork& network, std::vector<Ue>& ues, AccessNode& accessNode, std::uint64_t nowMs) {
     auto ready = network.pollReady(nowMs);
+
     for (const auto& datagram : ready) {
-        if (datagram.toNodeId == ue.nodeId()) {
-            ue.onDatagram(datagram, nowMs);
-        } else if (datagram.toNodeId == accessNode.nodeId()) {
+        if (datagram.toNodeId == accessNode.nodeId()) {
             accessNode.onDatagram(datagram, nowMs);
+            continue;
         }
+
+        for (auto& ue : ues) {
+            if (datagram.toNodeId == ue.nodeId()) {
+                ue.onDatagram(datagram, nowMs);
+                break;
+            }
+        }
+    }
+}
+
+void submitOutgoingFromUes(VirtualNetwork& network, std::vector<Ue>& ues, std::uint64_t nowMs) {
+    for (auto& ue : ues) {
+        submitOutgoing(network, ue.flushOutgoing(), nowMs);
     }
 }
 
@@ -36,105 +49,203 @@ SimulationResult ScenarioRunner::run() {
     SimulationResult result;
     result.scenarioName = config_.scenarioName;
 
-    Ue ue(config_.ueId, config_.accessNodeId, config_.transportMode, config_.timers);
-    AccessNode accessNode(config_.accessNodeId, config_.ueId, CoreNetwork(config_.timers));
+    std::vector<Ue> ues;
+    std::vector<std::vector<TrafficEvent>> trafficEventsPerUe;
+    std::vector<std::size_t> eventIndexes;
+
+    for (const auto& ueConfig : config_.ueConfigs) {
+        ues.emplace_back(
+            ueConfig.ueId,
+            config_.accessNodeId,
+            config_.transportMode,
+            config_.timers
+        );
+
+        TrafficGenerator generator(ueConfig.trafficProfile, ueConfig.ueId);
+        auto trafficEvents = generator.generate();
+
+        UeSimulationResult ueResult;
+        ueResult.ueId = ueConfig.ueId;
+        ueResult.trafficStarted = false;
+        ueResult.packetsGenerated = trafficEvents.size();
+
+        for (const auto& event : trafficEvents) {
+            ueResult.bytesGenerated += event.payload.size();
+        }
+
+        result.ueResults.push_back(ueResult);
+        trafficEventsPerUe.push_back(std::move(trafficEvents));
+        eventIndexes.push_back(0);
+    }
+
+    AccessNode accessNode(config_.accessNodeId, CoreNetwork(config_.timers));
     VirtualNetwork network(config_.linkProfile, 1337);
 
-    TrafficGenerator generator(config_.trafficProfile, 7);
-    const auto trafficEvents = generator.generate();
-    result.trafficStarted = false;
-    result.packetsGenerated = trafficEvents.size();
-    for (const auto& event : trafficEvents) {
-        result.bytesGenerated += event.payload.size();
-    }
-
     std::uint64_t nowMs = 0;
-    ue.startAttach(nowMs);
-    submitOutgoing(network, ue.flushOutgoing(), nowMs);
-    deliverReady(network, ue, accessNode, nowMs);
 
-    while (nowMs <= config_.attachPhaseBudgetMs && !ue.isAttached()) {
-        nowMs += config_.stepMs;
-        ue.tick(nowMs);
-        accessNode.tick(nowMs);
-        submitOutgoing(network, ue.flushOutgoing(), nowMs);
-        submitOutgoing(network, accessNode.flushOutgoing(), nowMs);
-        deliverReady(network, ue, accessNode, nowMs);
+    for (auto& ue : ues) {
+        ue.startAttach(nowMs);
     }
-    result.attachSucceeded = ue.isAttached();
-    if (!result.attachSucceeded) {
-        result.notes.push_back("Attach phase ended without reaching Attached state.");
-        result.notes.push_back("Traffic and detach phases skipped because no session was established.");
+
+    submitOutgoingFromUes(network, ues, nowMs);
+    submitOutgoing(network, accessNode.flushOutgoing(), nowMs);
+    deliverReady(network, ues, accessNode, nowMs);
+
+    auto allAttached = [&]() {
+        for (const auto& ue : ues) {
+            if (!ue.isAttached()) {
+                return false;
+            }
+        }
+        return !ues.empty();
+    };
+
+    while (nowMs <= config_.attachPhaseBudgetMs && !allAttached()) {
+        nowMs += config_.stepMs;
+
+        for (auto& ue : ues) {
+            ue.tick(nowMs);
+        }
+
+        accessNode.tick(nowMs);
+
+        submitOutgoingFromUes(network, ues, nowMs);
+        submitOutgoing(network, accessNode.flushOutgoing(), nowMs);
+        deliverReady(network, ues, accessNode, nowMs);
+    }
+
+    bool anyAttached = false;
+
+    for (std::size_t i = 0; i < ues.size(); ++i) {
+        result.ueResults[i].attachSucceeded = ues[i].isAttached();
+        result.ueResults[i].finalUeState = ues[i].state();
+
+        if (ues[i].isAttached()) {
+            anyAttached = true;
+        } else {
+            result.ueResults[i].notes.push_back("Attach phase ended without reaching Attached state.");
+            result.ueResults[i].notes.push_back("Traffic and detach phases skipped because no session was established.");
+        }
+    }
+
+    if (!anyAttached) {
+        result.notes.push_back("No UE reached Attached state.");
 
         result.totalDurationMs = nowMs;
-        result.finalUeState = ue.state();
         result.packetsDroppedInNetwork = network.metrics().packetsDropped;
         result.packetsDeliveredByNetwork = network.metrics().packetsDelivered;
         result.activeSessionsAtEnd = accessNode.coreNetwork().activeSessionCount();
+        result.expiredSessions = accessNode.coreNetwork().expiredSessions();
+
         return result;
     }
 
+    std::uint64_t maxTrafficDurationMs = 0;
+
+    for (const auto& ueConfig : config_.ueConfigs) {
+        if (ueConfig.trafficProfile.durationMs > maxTrafficDurationMs) {
+            maxTrafficDurationMs = ueConfig.trafficProfile.durationMs;
+        }
+    }
+
     const std::uint64_t trafficStartMs = nowMs;
-    std::size_t eventIndex = 0;
-    while (nowMs < trafficStartMs + config_.trafficProfile.durationMs) {
-        while (eventIndex < trafficEvents.size() && trafficStartMs + trafficEvents[eventIndex].timestampMs <= nowMs) {
-            if (ue.isAttached()) {
-                result.trafficStarted = true;
+
+    while (nowMs < trafficStartMs + maxTrafficDurationMs) {
+        for (std::size_t i = 0; i < ues.size(); ++i) {
+            auto& events = trafficEventsPerUe[i];
+            auto& eventIndex = eventIndexes[i];
+
+            while (eventIndex < events.size() &&
+                   trafficStartMs + events[eventIndex].timestampMs <= nowMs) {
+                const auto packetsBefore = ues[i].metrics().packetsSent;
+
+                ues[i].sendTraffic(events[eventIndex].payload, nowMs);
+
+                if (ues[i].metrics().packetsSent > packetsBefore) {
+                    result.ueResults[i].trafficStarted = true;
+                }
+
+                ++eventIndex;
             }
-            ue.sendTraffic(trafficEvents[eventIndex].payload, nowMs);
-            ++eventIndex;
         }
 
         nowMs += config_.stepMs;
-        ue.tick(nowMs);
+
+        for (auto& ue : ues) {
+            ue.tick(nowMs);
+        }
+
         accessNode.tick(nowMs);
-        submitOutgoing(network, ue.flushOutgoing(), nowMs);
+
+        submitOutgoingFromUes(network, ues, nowMs);
         submitOutgoing(network, accessNode.flushOutgoing(), nowMs);
-        deliverReady(network, ue, accessNode, nowMs);
+        deliverReady(network, ues, accessNode, nowMs);
     }
 
-    ue.startDetach(nowMs);
-    submitOutgoing(network, ue.flushOutgoing(), nowMs);
-    deliverReady(network, ue, accessNode, nowMs);
+    for (auto& ue : ues) {
+        if (ue.isAttached()) {
+            ue.startDetach(nowMs);
+        }
+    }
+
+    submitOutgoingFromUes(network, ues, nowMs);
+    submitOutgoing(network, accessNode.flushOutgoing(), nowMs);
+    deliverReady(network, ues, accessNode, nowMs);
+
+    auto anyUeStillActive = [&]() {
+        for (const auto& ue : ues) {
+            if (ue.isAttached() || ue.state() == SessionState::Detaching) {
+                return true;
+            }
+        }
+        return false;
+    };
 
     const std::uint64_t detachDeadlineMs = nowMs + config_.detachPhaseBudgetMs;
+
     while (nowMs <= detachDeadlineMs &&
-           (ue.isAttached() || ue.state() == SessionState::Detaching || accessNode.coreNetwork().activeSessionCount() > 0)) {
+           (anyUeStillActive() || accessNode.coreNetwork().activeSessionCount() > 0)) {
         nowMs += config_.stepMs;
-        ue.tick(nowMs);
+
+        for (auto& ue : ues) {
+            ue.tick(nowMs);
+        }
+
         accessNode.tick(nowMs);
-        submitOutgoing(network, ue.flushOutgoing(), nowMs);
+
+        submitOutgoingFromUes(network, ues, nowMs);
         submitOutgoing(network, accessNode.flushOutgoing(), nowMs);
-        deliverReady(network, ue, accessNode, nowMs);
+        deliverReady(network, ues, accessNode, nowMs);
     }
 
-    result.detachSucceeded = !ue.isAttached() && accessNode.coreNetwork().activeSessionCount() == 0;
-    if (!result.detachSucceeded) {
-         if (!ue.isAttached() && accessNode.coreNetwork().activeSessionCount() > 0) {
-        result.notes.push_back(
-            "UE left Attached state, but CoreNetwork still has an active session."
-        );
-        } else {
-            result.notes.push_back("Detach phase did not close the session cleanly.");
+    for (std::size_t i = 0; i < ues.size(); ++i) {
+        result.ueResults[i].finalUeState = ues[i].state();
+
+        if (!result.ueResults[i].attachSucceeded) {
+            continue;
+        }
+
+        result.ueResults[i].detachSucceeded =
+            !ues[i].isAttached() &&
+            ues[i].state() != SessionState::Detaching;
+
+        if (!result.ueResults[i].detachSucceeded) {
+            result.ueResults[i].notes.push_back("Detach phase did not close the UE session cleanly.");
         }
     }
 
     result.totalDurationMs = nowMs;
-    result.finalUeState = ue.state();
-    result.packetsDeliveredToCore = accessNode.coreNetwork().deliveredPackets();
-    result.bytesDeliveredToCore = accessNode.coreNetwork().deliveredBytes();
     result.packetsDroppedInNetwork = network.metrics().packetsDropped;
     result.packetsDeliveredByNetwork = network.metrics().packetsDelivered;
     result.activeSessionsAtEnd = accessNode.coreNetwork().activeSessionCount();
-    result.throughputMbps = (config_.trafficProfile.durationMs == 0)
-                                ? 0.0
-                                : (static_cast<double>(result.bytesDeliveredToCore) * 8.0) /
-                                      (static_cast<double>(config_.trafficProfile.durationMs) / 1000.0) / 1'000'000.0;
-
     result.expiredSessions = accessNode.coreNetwork().expiredSessions();
-    
-    if (result.bytesDeliveredToCore == 0) {
+
+    if (accessNode.coreNetwork().deliveredBytes() == 0) {
         result.notes.push_back("No user-plane payload reached the simplified core.");
+    }
+
+    if (result.activeSessionsAtEnd > 0) {
+        result.notes.push_back("Some sessions are still active at the end of the scenario.");
     }
 
     return result;
