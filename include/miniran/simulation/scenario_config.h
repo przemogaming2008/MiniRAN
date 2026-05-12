@@ -12,14 +12,18 @@
 namespace miniran {
 
 struct UeConfig {
+    std::uint32_t nodeId = 7;
     std::uint32_t ueId = 7;
 
     std::uint64_t attachStartMs = 0;
     std::uint64_t trafficStartMs = 0;
     std::uint64_t trafficEndMs = 1000;
 
-    TrafficProfile trafficProfile{};
+    TrafficProfile uplinkTrafficProfile{};
 
+    TrafficProfile downlinkTrafficProfile{};
+
+    bool downlinkEnabled = false;
 };
 
 struct ScenarioConfig {
@@ -34,8 +38,8 @@ struct ScenarioConfig {
     SessionTimers timers{};
     LinkProfile linkProfile{};
 
-    std::uint32_t networkSeed = 1;
-    std::uint32_t trafficSeed = 2;
+    std::uint32_t networkSeed = 1337;
+    std::uint32_t trafficSeed = 7;
 
     std::vector<UeConfig> ueConfigs{{}};
 
