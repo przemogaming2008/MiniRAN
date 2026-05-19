@@ -13,12 +13,24 @@ namespace miniran {
 
 class Ue {
 public:
-    Ue(std::uint32_t nodeId, std::uint32_t accessNodeId, TransportMode transportMode, SessionTimers timers = {});
+    Ue(
+        std::uint32_t nodeId,
+        std::uint32_t ueId,
+        std::uint32_t accessNodeId,
+        TransportMode transportMode,
+        SessionTimers timers = {}
+    );
 
     std::uint32_t nodeId() const;
+    std::uint32_t ueId() const;
+    std::uint32_t sessionId() const;
+
     SessionState state() const;
     bool isAttached() const;
-    const FlowMetrics& metrics() const;
+
+    const FlowMetrics& uplinkMetrics() const;
+    const FlowMetrics& downlinkMetrics() const;
+    const UeProtocolMetrics& protocolMetrics() const;
 
     void startAttach(std::uint64_t nowMs);
     void startDetach(std::uint64_t nowMs);
@@ -29,11 +41,17 @@ public:
 
 private:
     std::uint32_t nodeId_ = 0;
+    std::uint32_t ueId_ = 0;
     std::uint32_t accessNodeId_ = 0;
-    
+
     SessionManager sessionManager_;
-    FlowMetrics metrics_{};
+
+    FlowMetrics uplinkMetrics_{};
+    FlowMetrics downlinkMetrics_{};
+    UeProtocolMetrics protocolMetrics_{};
+
     std::deque<Datagram> outgoing_;
 };
+
 
 }  // namespace miniran

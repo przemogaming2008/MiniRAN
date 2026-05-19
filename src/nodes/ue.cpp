@@ -6,13 +6,30 @@
 
 namespace miniran {
 
-Ue::Ue(std::uint32_t nodeId, std::uint32_t accessNodeId, TransportMode transportMode, SessionTimers timers)
-    : nodeId_(nodeId), accessNodeId_(accessNodeId), sessionManager_(nodeId, timers) {
+Ue::Ue(
+    std::uint32_t nodeId,
+    std::uint32_t ueId,
+    std::uint32_t accessNodeId,
+    TransportMode transportMode,
+    SessionTimers timers
+)
+    : nodeId_(nodeId),
+      ueId_(ueId),
+      accessNodeId_(accessNodeId),
+      sessionManager_(ueId, timers) {
     (void)transportMode;
 }
 
 std::uint32_t Ue::nodeId() const {
     return nodeId_;
+}
+
+std::uint32_t Ue::ueId() const {
+    return ueId_;
+}
+
+std::uint32_t Ue::sessionId() const {
+    return sessionManager_.sessionId();
 }
 
 SessionState Ue::state() const {
@@ -23,8 +40,16 @@ bool Ue::isAttached() const {
     return sessionManager_.isAttached();
 }
 
-const FlowMetrics& Ue::metrics() const {
-    return metrics_;
+const FlowMetrics& Ue::uplinkMetrics() const {
+    return uplinkMetrics_;
+}
+
+const FlowMetrics& Ue::downlinkMetrics() const {
+    return downlinkMetrics_;
+}
+
+const UeProtocolMetrics& Ue::protocolMetrics() const {
+    return protocolMetrics_;
 }
 
 void Ue::startAttach(std::uint64_t nowMs) {
@@ -97,9 +122,9 @@ void Ue::sendTraffic(const std::vector<std::uint8_t>& payload, std::uint64_t now
         nowMs,
         payload
     );
-    //Update UE metrics_.
-    metrics_.bytesSent += payload.size();
-    metrics_.packetsSent += 1;
+    //Update uplink metrics.
+    uplinkMetrics_.packetsSent += 1;
+    uplinkMetrics_.bytesSent += payload.size();
     //Push a user-plane datagram to outgoing_.
     Datagram datagram{};  //datagram.controlPlane = false;
     datagram.fromNodeId = nodeId_;
@@ -145,6 +170,7 @@ void Ue::tick(std::uint64_t nowMs) {
     }
 
     else if (decision.messageType == MessageType::Heartbeat) {
+        protocolMetrics_.heartbeatsSent += 1;
         ProtocolMessage msg = makeMessage(
             MessageType::Heartbeat,
             sessionManager_.ueId(),
@@ -160,13 +186,10 @@ void Ue::tick(std::uint64_t nowMs) {
     Datagram datagram = Datagram{};
     
     datagram.fromNodeId = nodeId_;
-    datagram.toNodeId = accessNodeId_ ;
+    datagram.toNodeId = accessNodeId_;
     datagram.enqueueTimeMs = nowMs;
     datagram.controlPlane = true;
     datagram.bytes = encoded_msg;
-
-    metrics_.packetsSent += 1;
-    metrics_.bytesSent += datagram.bytes.size();
 
     outgoing_.push_back(datagram);
 }
@@ -180,7 +203,8 @@ void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
     if(protocolMessage_opt){
         ProtocolMessage protocolMessage = *protocolMessage_opt;
 
-        if (protocolMessage.header.ueId != nodeId()) {
+        if (protocolMessage.header.ueId != ueId()) {
+            protocolMetrics_.invalidMessagesDropped += 1;
             return;
         }
 
@@ -189,22 +213,39 @@ void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
             sessionManager_.onAttachAccepted(protocolMessage.header.sessionId,nowMs);
         } else if (protocolMessage.header.messageType == MessageType::DetachAccept){
             if (protocolMessage.header.sessionId != sessionManager_.sessionId()) {
+                protocolMetrics_.invalidMessagesDropped += 1;
                 return;
             }
             sessionManager_.onDetachAccepted(nowMs);
         } else if (protocolMessage.header.messageType == MessageType::HeartbeatAck){
             if (protocolMessage.header.sessionId != sessionManager_.sessionId()) {
+                protocolMetrics_.invalidMessagesDropped += 1;
                 return;
             }
+            protocolMetrics_.heartbeatAcksReceived += 1;
             sessionManager_.onHeartbeatResponse(nowMs);
         } else if (protocolMessage.header.messageType == MessageType::Error){
-            //error message type, to do?
-        } else {
-            //inapropriate messagetype
-        }
+            protocolMetrics_.protocolErrorsReceived += 1;
 
+        } else if (protocolMessage.header.messageType == MessageType::Data) {
+            if (protocolMessage.header.sessionId != sessionManager_.sessionId()) {
+                protocolMetrics_.invalidMessagesDropped += 1;
+                return;
+            }
+
+            if (!sessionManager_.isAttached()) {
+                protocolMetrics_.invalidMessagesDropped += 1;
+                return;
+            }
+
+            downlinkMetrics_.packetsDelivered += 1;
+            downlinkMetrics_.bytesDelivered += protocolMessage.payload.size();
+
+        } else {
+            protocolMetrics_.invalidMessagesDropped += 1;
+        }
     } else {
-        //opt, error
+        protocolMetrics_.invalidMessagesDropped += 1;
     }
 }
 
