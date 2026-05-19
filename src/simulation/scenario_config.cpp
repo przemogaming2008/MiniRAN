@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <exception>
 
 namespace miniran {
@@ -100,6 +101,43 @@ std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, 
         }
         return true;
     };
+    auto parseBool = [&](const std::string& key, bool& target) -> bool {
+        if (const auto value = readValue(values, key)) {
+            if (*value == "true" || *value == "1" || *value == "yes") {
+                target = true;
+            } else if (*value == "false" || *value == "0" || *value == "no") {
+                target = false;
+            } else {
+                error = "Invalid bool value for key: " + key;
+                return false;
+            }
+        }
+        return true;
+    };
+    auto parseTraffic = [&](const std::string& prefix, TrafficProfile& profile) -> bool {
+        if (const auto value = readValue(values, prefix + "traffic_pattern")) {
+            const auto parsed = parseTrafficPattern(*value);
+            if (!parsed) {
+                error = "Invalid traffic_pattern: " + *value;
+                return false;
+            }
+            profile.pattern = *parsed;
+        }
+
+        if (!parseSize(prefix + "packet_size_bytes", profile.packetSizeBytes)) return false;
+        if (!parseUnsigned32(prefix + "packets_per_second", profile.packetsPerSecond)) return false;
+        if (!parseUnsigned32(prefix + "burst_packets", profile.burstPackets)) return false;
+        if (!parseUnsigned32(prefix + "burst_interval_ms", profile.burstIntervalMs)) return false;
+        if (!parseUnsigned32(prefix + "ramp_start_pps", profile.rampStartPps)) return false;
+        if (!parseUnsigned32(prefix + "ramp_end_pps", profile.rampEndPps)) return false;
+
+        if (!profile.isValid()) {
+            error = "Invalid TrafficProfile values for prefix: " + prefix;
+            return false;
+        }
+
+        return true;
+    };
     ScenarioConfig config;
 
     if (const auto value = readValue(values, "scenario_name")) {
@@ -114,20 +152,12 @@ std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, 
         config.transportMode = *parsed;
         config.linkProfile.mode = *parsed;
     }
-    if (const auto value = readValue(values, "traffic_pattern")) {
-        const auto parsed = parseTrafficPattern(*value);
-        if (!parsed) {
-            error = "Invalid traffic_pattern: " + *value;
-            return std::nullopt;
-        }
-        config.trafficProfile.pattern = *parsed;
-    }
-
-    if (!parseUnsigned32("ue_id", config.ueId)) return std::nullopt;
-    if (!parseUnsigned32("access_node_id", config.accessNodeId)) return std::nullopt;
+     if (!parseUnsigned32("access_node_id", config.accessNodeId)) return std::nullopt;
     if (!parseUnsigned("step_ms", config.stepMs)) return std::nullopt;
-    if (!parseUnsigned("attach_phase_budget_ms", config.attachPhaseBudgetMs)) return std::nullopt;
-    if (!parseUnsigned("detach_phase_budget_ms", config.detachPhaseBudgetMs)) return std::nullopt;
+    if (!parseUnsigned("scenario_duration_ms", config.scenarioDurationMs)) return std::nullopt;
+
+    if (!parseUnsigned32("network_seed", config.networkSeed)) return std::nullopt;
+    if (!parseUnsigned32("traffic_seed", config.trafficSeed)) return std::nullopt;
 
     if (!parseUnsigned32("attach_timeout_ms", config.timers.attachTimeoutMs)) return std::nullopt;
     if (!parseUnsigned32("detach_timeout_ms", config.timers.detachTimeoutMs)) return std::nullopt;
@@ -143,25 +173,94 @@ std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, 
     if (!parseUnsigned("bandwidth_kbps", config.linkProfile.bandwidthKbps)) return std::nullopt;
     if (!parseSize("queue_limit_packets", config.linkProfile.queueLimitPackets)) return std::nullopt;
 
-    if (!parseUnsigned("traffic_duration_ms", config.trafficProfile.durationMs)) return std::nullopt;
-    if (!parseSize("packet_size_bytes", config.trafficProfile.packetSizeBytes)) return std::nullopt;
-    if (!parseUnsigned32("packets_per_second", config.trafficProfile.packetsPerSecond)) return std::nullopt;
-    if (!parseUnsigned32("burst_packets", config.trafficProfile.burstPackets)) return std::nullopt;
-    if (!parseUnsigned32("burst_interval_ms", config.trafficProfile.burstIntervalMs)) return std::nullopt;
-    if (!parseUnsigned32("ramp_start_pps", config.trafficProfile.rampStartPps)) return std::nullopt;
-    if (!parseUnsigned32("ramp_end_pps", config.trafficProfile.rampEndPps)) return std::nullopt;
-
     if (!config.linkProfile.isValid()) {
         error = "Invalid LinkProfile values.";
         return std::nullopt;
     }
-    if (!config.trafficProfile.isValid()) {
-        error = "Invalid TrafficProfile values.";
-        return std::nullopt;
-    }
+
     if (config.stepMs == 0) {
         error = "step_ms must be > 0.";
         return std::nullopt;
+    }
+
+    if (config.scenarioDurationMs == 0) {
+        error = "scenario_duration_ms must be > 0.";
+        return std::nullopt;
+    }
+
+    std::uint32_t ueCount = 1;
+    if (!parseUnsigned32("ue_count", ueCount)) return std::nullopt;
+
+    if (ueCount == 0) {
+        error = "ue_count must be > 0.";
+        return std::nullopt;
+    }
+
+    config.ueConfigs.clear();
+
+    std::unordered_set<std::uint32_t> usedNodeIds;
+    std::unordered_set<std::uint32_t> usedUeIds;
+
+    for (std::uint32_t i = 0; i < ueCount; ++i) {
+        const std::string prefix = "ue." + std::to_string(i) + ".";
+
+        UeConfig ueConfig;
+        ueConfig.nodeId = 7 + i;
+        ueConfig.ueId = 7 + i;
+
+        if (!parseUnsigned32(prefix + "node_id", ueConfig.nodeId)) return std::nullopt;
+        if (!parseUnsigned32(prefix + "ue_id", ueConfig.ueId)) return std::nullopt;
+
+        if (!parseUnsigned(prefix + "attach_start_ms", ueConfig.attachStartMs)) return std::nullopt;
+        if (!parseUnsigned(prefix + "traffic_start_ms", ueConfig.trafficStartMs)) return std::nullopt;
+        if (!parseUnsigned(prefix + "traffic_end_ms", ueConfig.trafficEndMs)) return std::nullopt;
+
+        if (ueConfig.nodeId == config.accessNodeId) {
+            error = "UE node_id cannot be equal to access_node_id.";
+            return std::nullopt;
+        }
+
+        if (!usedNodeIds.insert(ueConfig.nodeId).second) {
+            error = "Duplicate UE node_id.";
+            return std::nullopt;
+        }
+
+        if (!usedUeIds.insert(ueConfig.ueId).second) {
+            error = "Duplicate ue_id.";
+            return std::nullopt;
+        }
+
+        if (ueConfig.trafficEndMs <= ueConfig.trafficStartMs) {
+            error = "traffic_end_ms must be greater than traffic_start_ms.";
+            return std::nullopt;
+        }
+
+        if (ueConfig.attachStartMs > config.scenarioDurationMs ||
+            ueConfig.trafficStartMs > config.scenarioDurationMs ||
+            ueConfig.trafficEndMs > config.scenarioDurationMs) {
+            error = "UE timing exceeds scenario_duration_ms.";
+            return std::nullopt;
+        }
+
+        ueConfig.uplinkTrafficProfile.durationMs = ueConfig.trafficEndMs - ueConfig.trafficStartMs;
+
+        if (!parseTraffic(prefix + "uplink.", ueConfig.uplinkTrafficProfile)) {
+            return std::nullopt;
+        }
+
+        if (!parseBool(prefix + "downlink_enabled", ueConfig.downlinkEnabled)) {
+            return std::nullopt;
+        }
+
+        if (ueConfig.downlinkEnabled) {
+            ueConfig.downlinkTrafficProfile.durationMs = ueConfig.trafficEndMs - ueConfig.trafficStartMs;
+
+            if (!parseTraffic(prefix + "downlink.", ueConfig.downlinkTrafficProfile)) {
+                return std::nullopt;
+            }
+        }
+
+        config.ueConfigs.push_back(ueConfig);
     }
 
     error.clear();
