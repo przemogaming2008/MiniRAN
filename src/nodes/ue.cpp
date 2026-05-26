@@ -33,6 +33,10 @@ std::uint32_t Ue::sessionId() const {
     return sessionManager_.sessionId();
 }
 
+std::uint32_t Ue::lastSessionId() const {
+    return sessionManager_.lastSessionId();
+}
+
 SessionState Ue::state() const {
     return sessionManager_.state();
 }
@@ -58,10 +62,7 @@ const UeProtocolMetrics& Ue::protocolMetrics() const {
 }
 
 void Ue::startAttach(std::uint64_t nowMs) {
-
-    //Ask SessionManager if attach may start.
-    if (sessionManager_.beginAttach(nowMs) == true) {
-        //Create AttachRequest message.
+    if (sessionManager_.beginAttach(nowMs)) {
         ProtocolMessage msg = makeMessage(
             MessageType::AttachRequest,
             sessionManager_.ueId(),
@@ -70,24 +71,18 @@ void Ue::startAttach(std::uint64_t nowMs) {
             nowMs
         );
 
-        //Encode it using FrameCodec.
-        std::vector<std::uint8_t> encoded_msg = FrameCodec::encode(msg);
-
-        //Push a control-plane datagram to outgoing_.
         Datagram datagram = Datagram{};
         datagram.fromNodeId = nodeId_;
         datagram.toNodeId = accessNodeId_;
         datagram.enqueueTimeMs = nowMs;
         datagram.controlPlane = true;
-        datagram.bytes = encoded_msg;
+        datagram.bytes = FrameCodec::encode(msg);
 
         outgoing_.push_back(datagram);
     }
 }
 
 void Ue::startDetach(std::uint64_t nowMs) {
-
-    //Build and queue DetachRequest when session is active.
     if (!sessionManager_.beginDetach(nowMs)) {
         return;
     }
@@ -100,26 +95,21 @@ void Ue::startDetach(std::uint64_t nowMs) {
         nowMs
     );
 
-    std::vector<std::uint8_t> encoded_msg = FrameCodec::encode(msg);
-
     Datagram datagram = Datagram{};
     datagram.fromNodeId = nodeId_;
     datagram.toNodeId = accessNodeId_;
     datagram.enqueueTimeMs = nowMs;
     datagram.controlPlane = true;
-    datagram.bytes = encoded_msg;
+    datagram.bytes = FrameCodec::encode(msg);
 
     outgoing_.push_back(datagram);
 }
 
 void Ue::sendTraffic(const std::vector<std::uint8_t>& payload, std::uint64_t nowMs) {
-
-    //Check if data can be sent.
     if (!sessionManager_.canSendData()) {
         return;
     }
 
-    //Wrap payload into a Data message.
     ProtocolMessage msg = makeMessage(
         MessageType::Data,
         sessionManager_.ueId(),
@@ -129,12 +119,10 @@ void Ue::sendTraffic(const std::vector<std::uint8_t>& payload, std::uint64_t now
         payload
     );
 
-    //Update uplink metrics.
     uplinkMetrics_.packetsSent += 1;
     uplinkMetrics_.bytesSent += payload.size();
 
-    //Push a user-plane datagram to outgoing_.
-    Datagram datagram{};
+    Datagram datagram = Datagram{};
     datagram.fromNodeId = nodeId_;
     datagram.toNodeId = accessNodeId_;
     datagram.enqueueTimeMs = nowMs;
@@ -145,16 +133,13 @@ void Ue::sendTraffic(const std::vector<std::uint8_t>& payload, std::uint64_t now
 }
 
 void Ue::tick(std::uint64_t nowMs) {
-
-    //React to SessionManager::onTick().
-    //Possible actions: retransmit AttachRequest / DetachRequest / send Heartbeat.
     RetryDecision decision = sessionManager_.onTick(nowMs);
 
     if (!decision.shouldRetransmit) {
         return;
     }
 
-    std::vector<std::uint8_t> encoded_msg;
+    std::vector<std::uint8_t> encodedMsg;
 
     if (decision.messageType == MessageType::AttachRequest) {
         protocolMetrics_.attachRetries += 1;
@@ -167,7 +152,7 @@ void Ue::tick(std::uint64_t nowMs) {
             nowMs
         );
 
-        encoded_msg = FrameCodec::encode(msg);
+        encodedMsg = FrameCodec::encode(msg);
     } else if (decision.messageType == MessageType::DetachRequest) {
         protocolMetrics_.detachRetries += 1;
 
@@ -179,7 +164,7 @@ void Ue::tick(std::uint64_t nowMs) {
             nowMs
         );
 
-        encoded_msg = FrameCodec::encode(msg);
+        encodedMsg = FrameCodec::encode(msg);
     } else if (decision.messageType == MessageType::Heartbeat) {
         protocolMetrics_.heartbeatsSent += 1;
 
@@ -191,7 +176,7 @@ void Ue::tick(std::uint64_t nowMs) {
             nowMs
         );
 
-        encoded_msg = FrameCodec::encode(msg);
+        encodedMsg = FrameCodec::encode(msg);
     } else {
         return;
     }
@@ -201,30 +186,27 @@ void Ue::tick(std::uint64_t nowMs) {
     datagram.toNodeId = accessNodeId_;
     datagram.enqueueTimeMs = nowMs;
     datagram.controlPlane = true;
-    datagram.bytes = encoded_msg;
+    datagram.bytes = std::move(encodedMsg);
 
     outgoing_.push_back(datagram);
 }
 
 void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
-
-    //Decode incoming bytes.
     std::string error;
-    std::optional<ProtocolMessage> protocolMessage_opt = FrameCodec::decode(datagram.bytes, error);
+    std::optional<ProtocolMessage> protocolMessageOpt = FrameCodec::decode(datagram.bytes, error);
 
-    if (!protocolMessage_opt) {
+    if (!protocolMessageOpt) {
         protocolMetrics_.invalidMessagesDropped += 1;
         return;
     }
 
-    ProtocolMessage protocolMessage = *protocolMessage_opt;
+    ProtocolMessage protocolMessage = *protocolMessageOpt;
 
     if (protocolMessage.header.ueId != ueId_) {
         protocolMetrics_.invalidMessagesDropped += 1;
         return;
     }
 
-    //Handle AttachAccept / DetachAccept / HeartbeatAck / DataAck / DownlinkData / Error.
     if (protocolMessage.header.messageType == MessageType::AttachAccept) {
         sessionManager_.onAttachAccepted(protocolMessage.header.sessionId, nowMs);
         return;

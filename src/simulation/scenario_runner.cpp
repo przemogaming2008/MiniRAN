@@ -235,7 +235,7 @@ SimulationResult ScenarioRunner::run() {
         const auto& ueConfig = config_.ueConfigs[i];
 
         result.ueResults[i].finalUeState = ues[i].state();
-        result.ueResults[i].sessionId = ues[i].sessionId();
+        result.ueResults[i].sessionId = ues[i].lastSessionId();
         result.ueResults[i].protocolMetrics = ues[i].protocolMetrics();
 
         result.ueResults[i].attachSucceeded =

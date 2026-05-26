@@ -13,6 +13,10 @@ std::uint32_t SessionManager::sessionId() const {
     return sessionId_;
 }
 
+std::uint32_t SessionManager::lastSessionId() const {
+    return lastSessionId_;
+}
+
 SessionState SessionManager::state() const {
     return state_;
 }
@@ -34,24 +38,23 @@ std::uint32_t SessionManager::nextSequenceNumber() {
 }
 
 bool SessionManager::beginAttach(std::uint64_t nowMs) {
-
-    //Allow transition Idle/Released -> Attaching.
-
-    //Allow re-attach after a previously rejected/failed attach attempt.
     if (state_ == SessionState::Idle ||
         state_ == SessionState::Released ||
         state_ == SessionState::Rejected) {
 
         state_ = SessionState::Attaching;
 
-        //Reset attach retry counter.
+        // New attach must start without an active session id.
+        sessionId_ = 0;
+
         attachRetryCount_ = 0;
+        detachRetryCount_ = 0;
         detachConfirmed_ = false;
 
-        //Remember the time of the control transmission.
         lastControlTxMs_ = nowMs;
+        lastHeartbeatAckMs_ = nowMs;
+        lastHeartbeatTxMs_ = nowMs;
 
-        //Return true only when a new AttachRequest should be sent.
         return true;
     }
 
@@ -59,21 +62,16 @@ bool SessionManager::beginAttach(std::uint64_t nowMs) {
 }
 
 bool SessionManager::onAttachAccepted(std::uint32_t sessionId, std::uint64_t nowMs) {
-
-    //Accept the session only if the current state is Attaching.
-    if (state() != SessionState::Attaching) {
+    if (state_ != SessionState::Attaching) {
         return false;
     }
 
-    //Store the assigned session id.
     sessionId_ = sessionId;
+    lastSessionId_ = sessionId_;
 
-    //Move to Attached.
     state_ = SessionState::Attached;
-
     detachConfirmed_ = false;
 
-    //Refresh activity timestamps.
     lastControlTxMs_ = nowMs;
     lastHeartbeatAckMs_ = nowMs;
     lastHeartbeatTxMs_ = nowMs;
@@ -82,18 +80,12 @@ bool SessionManager::onAttachAccepted(std::uint32_t sessionId, std::uint64_t now
 }
 
 bool SessionManager::beginDetach(std::uint64_t nowMs) {
-
-    //Allow transition Attached -> Detaching.
     if (state_ == SessionState::Attached) {
-
         detachConfirmed_ = false;
 
         state_ = SessionState::Detaching;
 
-        //Reset detach retry counter.
         detachRetryCount_ = 0;
-
-        //Remember last control tx time.
         lastControlTxMs_ = nowMs;
 
         return true;
@@ -103,18 +95,17 @@ bool SessionManager::beginDetach(std::uint64_t nowMs) {
 }
 
 bool SessionManager::onDetachAccepted(std::uint64_t nowMs) {
-
-    //Accept only if state is Detaching.
-    if (state() != SessionState::Detaching) {
+    if (state_ != SessionState::Detaching) {
         return false;
     }
 
     detachConfirmed_ = true;
 
-    //Move to Released.
+    lastSessionId_ = sessionId_;
+    sessionId_ = 0;
+
     state_ = SessionState::Released;
 
-    //Keep session id for post-analysis.
     lastControlTxMs_ = nowMs;
     lastHeartbeatAckMs_ = nowMs;
     lastHeartbeatTxMs_ = nowMs;
@@ -123,14 +114,10 @@ bool SessionManager::onDetachAccepted(std::uint64_t nowMs) {
 }
 
 void SessionManager::onHeartbeatResponse(std::uint64_t nowMs) {
-
-    //Update the last successful activity timestamp.
     lastHeartbeatAckMs_ = nowMs;
 }
 
 RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
-
-    //- If Attaching and timeout expired, request retransmission of AttachRequest.
     if (state_ == SessionState::Attaching &&
         (nowMs - lastControlTxMs_) >= timers_.attachTimeoutMs) {
 
@@ -140,13 +127,13 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
             return {true, MessageType::AttachRequest};
         }
 
-        //- If retries are exhausted, decide whether to move to Rejected/Released.
         state_ = SessionState::Rejected;
+        sessionId_ = 0;
         attachRetryCount_ = 0;
+        detachConfirmed_ = false;
         return {};
     }
 
-    //- If Detaching and timeout expired, request retransmission of DetachRequest.
     if (state_ == SessionState::Detaching &&
         (nowMs - lastControlTxMs_) >= timers_.detachTimeoutMs) {
 
@@ -156,23 +143,26 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
             return {true, MessageType::DetachRequest};
         }
 
-        //Detach retries exhausted without confirmation.
+        lastSessionId_ = sessionId_;
+        sessionId_ = 0;
+
         state_ = SessionState::Released;
         detachConfirmed_ = false;
         detachRetryCount_ = 0;
         return {};
     }
 
-    //- If Attached and heartbeat ACK has been missing for too long, mark session as lost.
     if (state_ == SessionState::Attached &&
         (nowMs - lastHeartbeatAckMs_) >= timers_.inactivityTimeoutMs) {
+
+        lastSessionId_ = sessionId_;
+        sessionId_ = 0;
 
         state_ = SessionState::Released;
         detachConfirmed_ = false;
         return {};
     }
 
-    //- If Attached and heartbeat interval elapsed, you may also request a Heartbeat.
     if (state_ == SessionState::Attached &&
         (nowMs - lastHeartbeatTxMs_) >= timers_.heartbeatIntervalMs) {
 
@@ -185,7 +175,9 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
 
 void SessionManager::reset() {
     state_ = SessionState::Idle;
+
     sessionId_ = 0;
+    lastSessionId_ = 0;
     nextSequenceNumber_ = 1;
 
     lastControlTxMs_ = 0;

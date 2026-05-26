@@ -28,6 +28,7 @@ public:
     std::uint32_t sessionId() const;
     SessionState state() const;
     bool isAttached() const;
+    std::uint32_t lastSessionId() const;
     bool canSendData() const;
     bool detachConfirmed() const;
 
@@ -55,6 +56,8 @@ private:
     std::uint32_t attachRetryCount_ = 0;
     std::uint32_t detachRetryCount_ = 0;
 
+    std::uint32_t lastSessionId_ = 0;
+    
     bool detachConfirmed_ = false;
 };
 
