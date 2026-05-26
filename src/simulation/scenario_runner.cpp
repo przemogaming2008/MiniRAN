@@ -1,9 +1,11 @@
 #include "miniran/simulation/scenario_runner.h"
 
 #include <utility>
+#include <vector>
 
 #include "miniran/nodes/access_node.h"
 #include "miniran/nodes/ue.h"
+#include "miniran/protocol/protocol_message.h"
 #include "miniran/traffic/traffic_generator.h"
 #include "miniran/transport/virtual_network.h"
 
@@ -14,6 +16,12 @@ namespace {
 void submitOutgoing(VirtualNetwork& network, std::vector<Datagram> datagrams, std::uint64_t nowMs) {
     for (auto& datagram : datagrams) {
         network.submit(std::move(datagram), nowMs);
+    }
+}
+
+void submitOutgoingFromUes(VirtualNetwork& network, std::vector<Ue>& ues, std::uint64_t nowMs) {
+    for (auto& ue : ues) {
+        submitOutgoing(network, ue.flushOutgoing(), nowMs);
     }
 }
 
@@ -35,12 +43,6 @@ void deliverReady(VirtualNetwork& network, std::vector<Ue>& ues, AccessNode& acc
     }
 }
 
-void submitOutgoingFromUes(VirtualNetwork& network, std::vector<Ue>& ues, std::uint64_t nowMs) {
-    for (auto& ue : ues) {
-        submitOutgoing(network, ue.flushOutgoing(), nowMs);
-    }
-}
-
 }  // namespace
 
 ScenarioRunner::ScenarioRunner(ScenarioConfig config) : config_(std::move(config)) {}
@@ -51,38 +53,64 @@ SimulationResult ScenarioRunner::run() {
     result.ueCount = config_.ueConfigs.size();
 
     std::vector<Ue> ues;
+
     std::vector<std::vector<TrafficEvent>> uplinkEventsPerUe;
+    std::vector<std::vector<TrafficEvent>> downlinkEventsPerUe;
+
     std::vector<std::size_t> uplinkEventIndexes;
+    std::vector<std::size_t> downlinkEventIndexes;
+
     std::vector<bool> attachStarted;
     std::vector<bool> detachStarted;
 
     for (const auto& ueConfig : config_.ueConfigs) {
         ues.emplace_back(
             ueConfig.nodeId,
+            ueConfig.ueId,
             config_.accessNodeId,
             config_.transportMode,
             config_.timers
         );
 
-        TrafficGenerator generator(
+        TrafficGenerator uplinkGenerator(
             ueConfig.uplinkTrafficProfile,
             config_.trafficSeed + ueConfig.ueId
         );
 
-        auto uplinkEvents = generator.generate();
+        auto uplinkEvents = uplinkGenerator.generate();
+
+        std::vector<TrafficEvent> downlinkEvents;
+        if (ueConfig.downlinkEnabled) {
+            TrafficGenerator downlinkGenerator(
+                ueConfig.downlinkTrafficProfile,
+                config_.trafficSeed + ueConfig.ueId + 10000U
+            );
+
+            downlinkEvents = downlinkGenerator.generate();
+        }
 
         UeSimulationResult ueResult;
         ueResult.nodeId = ueConfig.nodeId;
         ueResult.ueId = ueConfig.ueId;
-        ueResult.uplinkPacketsGenerated = uplinkEvents.size();
 
+        ueResult.uplinkPacketsGenerated = uplinkEvents.size();
         for (const auto& event : uplinkEvents) {
             ueResult.uplinkBytesGenerated += event.payload.size();
         }
 
+        ueResult.downlinkPacketsGenerated = downlinkEvents.size();
+        for (const auto& event : downlinkEvents) {
+            ueResult.downlinkBytesGenerated += event.payload.size();
+        }
+
         result.ueResults.push_back(ueResult);
+
         uplinkEventsPerUe.push_back(std::move(uplinkEvents));
+        downlinkEventsPerUe.push_back(std::move(downlinkEvents));
+
         uplinkEventIndexes.push_back(0);
+        downlinkEventIndexes.push_back(0);
+
         attachStarted.push_back(false);
         detachStarted.push_back(false);
     }
@@ -111,11 +139,20 @@ SimulationResult ScenarioRunner::run() {
 
                 while (eventIndex < events.size() &&
                        ueConfig.trafficStartMs + events[eventIndex].timestampMs <= nowMs) {
-                    const auto packetsBefore = ues[i].metrics().packetsSent;
+
+                    if (!ues[i].isAttached()) {
+                        result.ueResults[i].uplinkPacketsSkippedNoSession += 1;
+                        result.ueResults[i].uplinkBytesSkippedNoSession += events[eventIndex].payload.size();
+
+                        ++eventIndex;
+                        continue;
+                    }
+
+                    const auto packetsBefore = ues[i].uplinkMetrics().packetsSent;
 
                     ues[i].sendTraffic(events[eventIndex].payload, nowMs);
 
-                    if (ues[i].metrics().packetsSent > packetsBefore) {
+                    if (ues[i].uplinkMetrics().packetsSent > packetsBefore) {
                         result.ueResults[i].trafficStarted = true;
                     }
 
@@ -123,10 +160,49 @@ SimulationResult ScenarioRunner::run() {
                 }
             }
 
-            if (!detachStarted[i] && nowMs >= ueConfig.trafficEndMs) {
-                if (ues[i].isAttached()) {
-                    ues[i].startDetach(nowMs);
+            if (ueConfig.downlinkEnabled &&
+                attachStarted[i] &&
+                !detachStarted[i] &&
+                nowMs >= ueConfig.trafficStartMs &&
+                nowMs < ueConfig.trafficEndMs) {
+
+                auto& events = downlinkEventsPerUe[i];
+                auto& eventIndex = downlinkEventIndexes[i];
+
+                while (eventIndex < events.size() &&
+                       ueConfig.trafficStartMs + events[eventIndex].timestampMs <= nowMs) {
+
+                    if (!ues[i].isAttached() ||
+                        !accessNode.coreNetwork().hasActiveSession(ueConfig.ueId)) {
+                        result.ueResults[i].downlinkPacketsSkippedNoSession += 1;
+                        result.ueResults[i].downlinkBytesSkippedNoSession += events[eventIndex].payload.size();
+
+                        ++eventIndex;
+                        continue;
+                    }
+
+                    ProtocolMessage message = makeMessage(
+                        MessageType::DownlinkData,
+                        ueConfig.ueId,
+                        ues[i].sessionId(),
+                        static_cast<std::uint32_t>(eventIndex + 1),
+                        nowMs,
+                        events[eventIndex].payload
+                    );
+
+                    if (accessNode.queueDownlinkToUe(message, nowMs)) {
+                        result.ueResults[i].downlinkPacketsSent += 1;
+                        result.ueResults[i].downlinkBytesSent += events[eventIndex].payload.size();
+                    } else {
+                        result.ueResults[i].notes.push_back("Downlink packet could not be routed to UE.");
+                    }
+
+                    ++eventIndex;
                 }
+            }
+
+            if (!detachStarted[i] && nowMs >= ueConfig.trafficEndMs && ues[i].isAttached()) {
+                ues[i].startDetach(nowMs);
                 detachStarted[i] = true;
             }
         }
@@ -145,15 +221,23 @@ SimulationResult ScenarioRunner::run() {
     }
 
     result.totalDurationMs = nowMs;
+
     result.packetsDroppedInNetwork = network.metrics().packetsDropped;
+    result.packetsDroppedByLoss = network.metrics().packetsDroppedByLoss;
+    result.packetsDroppedByQueue = network.metrics().packetsDroppedByQueue;
     result.packetsDeliveredByNetwork = network.metrics().packetsDelivered;
+
     result.activeSessionsAtEnd = accessNode.coreNetwork().activeSessionCount();
     result.expiredSessions = accessNode.coreNetwork().expiredSessions();
+    result.protocolRejectedPackets = accessNode.coreNetwork().protocolRejectedPackets();
 
     for (std::size_t i = 0; i < ues.size(); ++i) {
         const auto& ueConfig = config_.ueConfigs[i];
 
         result.ueResults[i].finalUeState = ues[i].state();
+        result.ueResults[i].sessionId = ues[i].sessionId();
+        result.ueResults[i].protocolMetrics = ues[i].protocolMetrics();
+
         result.ueResults[i].attachSucceeded =
             ues[i].state() == SessionState::Attached ||
             ues[i].state() == SessionState::Detaching ||
@@ -161,13 +245,18 @@ SimulationResult ScenarioRunner::run() {
 
         result.ueResults[i].detachSucceeded =
             detachStarted[i] &&
-            !ues[i].isAttached() &&
-            ues[i].state() != SessionState::Detaching;
+            ues[i].detachConfirmed();
 
         result.ueResults[i].activeAtEnd = ues[i].isAttached();
 
-        result.ueResults[i].uplinkPacketsSent = ues[i].metrics().packetsSent;
-        result.ueResults[i].uplinkBytesSent = ues[i].metrics().bytesSent;
+        result.ueResults[i].uplinkPacketsSent = ues[i].uplinkMetrics().packetsSent;
+        result.ueResults[i].uplinkBytesSent = ues[i].uplinkMetrics().bytesSent;
+
+        result.ueResults[i].downlinkPacketsReceivedByUe =
+            ues[i].downlinkMetrics().packetsDelivered;
+
+        result.ueResults[i].downlinkBytesReceivedByUe =
+            ues[i].downlinkMetrics().bytesDelivered;
 
         result.ueResults[i].uplinkPacketsAcceptedByCore =
             accessNode.coreNetwork().deliveredPacketsForUe(ueConfig.ueId);
@@ -186,8 +275,17 @@ SimulationResult ScenarioRunner::run() {
                 : (static_cast<double>(result.ueResults[i].uplinkBytesAcceptedByCore) * 8.0) /
                       (static_cast<double>(trafficDurationMs) / 1000.0) / 1'000'000.0;
 
+        result.ueResults[i].downlinkThroughputMbps =
+            (trafficDurationMs == 0)
+                ? 0.0
+                : (static_cast<double>(result.ueResults[i].downlinkBytesReceivedByUe) * 8.0) /
+                      (static_cast<double>(trafficDurationMs) / 1000.0) / 1'000'000.0;
+
         result.uplinkPacketsAcceptedByCore += result.ueResults[i].uplinkPacketsAcceptedByCore;
         result.uplinkBytesAcceptedByCore += result.ueResults[i].uplinkBytesAcceptedByCore;
+
+        result.downlinkPacketsDeliveredToUe += result.ueResults[i].downlinkPacketsReceivedByUe;
+        result.downlinkBytesDeliveredToUe += result.ueResults[i].downlinkBytesReceivedByUe;
 
         if (result.ueResults[i].detachSucceeded) {
             ++result.cleanlyDetachedSessions;
@@ -212,6 +310,12 @@ SimulationResult ScenarioRunner::run() {
         (config_.scenarioDurationMs == 0)
             ? 0.0
             : (static_cast<double>(result.uplinkBytesAcceptedByCore) * 8.0) /
+                  (static_cast<double>(config_.scenarioDurationMs) / 1000.0) / 1'000'000.0;
+
+    result.totalDownlinkThroughputMbps =
+        (config_.scenarioDurationMs == 0)
+            ? 0.0
+            : (static_cast<double>(result.downlinkBytesDeliveredToUe) * 8.0) /
                   (static_cast<double>(config_.scenarioDurationMs) / 1000.0) / 1'000'000.0;
 
     if (result.uplinkBytesAcceptedByCore == 0) {

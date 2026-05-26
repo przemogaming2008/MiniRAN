@@ -29,6 +29,7 @@ public:
     SessionState state() const;
     bool isAttached() const;
     bool canSendData() const;
+    bool detachConfirmed() const;
 
     std::uint32_t nextSequenceNumber();
 
@@ -46,10 +47,15 @@ private:
     SessionState state_ = SessionState::Idle;
     std::uint32_t sessionId_ = 0;
     std::uint32_t nextSequenceNumber_ = 1;
+
     std::uint64_t lastControlTxMs_ = 0;
     std::uint64_t lastHeartbeatAckMs_ = 0;
+    std::uint64_t lastHeartbeatTxMs_ = 0;
+
     std::uint32_t attachRetryCount_ = 0;
     std::uint32_t detachRetryCount_ = 0;
+
+    bool detachConfirmed_ = false;
 };
 
 }  // namespace miniran

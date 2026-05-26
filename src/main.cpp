@@ -19,7 +19,8 @@ int main(int argc, char** argv) {
 
     miniran::ScenarioRunner runner(*config);
     const auto result = runner.run();
+
     std::cout << result.summary();
 
-    return (result.attachSucceeded && result.detachSucceeded) ? 0 : 3;
+    return result.succeeded() ? 0 : 3;
 }

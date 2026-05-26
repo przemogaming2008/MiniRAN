@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace miniran {
 
@@ -20,11 +21,13 @@ bool VirtualNetwork::submit(Datagram datagram, std::uint64_t nowMs) {
 
     if (profile_.mode == TransportMode::Udp && probability_(rng_) < profile_.lossPercent) {
         metrics_.packetsDropped += 1;
+        metrics_.packetsDroppedByLoss += 1;
         return true;
     }
     
     if (queue_.size() >= profile_.queueLimitPackets) {
         metrics_.packetsDropped += 1;
+        metrics_.packetsDroppedByQueue += 1;
         return false;
     }
 
@@ -33,7 +36,8 @@ bool VirtualNetwork::submit(Datagram datagram, std::uint64_t nowMs) {
     const int jitterValue = (profile_.jitterMs == 0) ? 0 : jitterDistribution(rng_);
 
     const std::uint64_t serializationDelayMs = static_cast<std::uint64_t>(
-        std::ceil((static_cast<double>(datagram.bytes.size()) * 8.0) / static_cast<double>(profile_.bandwidthKbps)));
+        std::ceil((static_cast<double>(datagram.bytes.size()) * 8.0) /
+                  static_cast<double>(profile_.bandwidthKbps)));
 
     const std::uint64_t scheduledTxMs = std::max(nowMs, nextAvailableTxMs_);
     nextAvailableTxMs_ = scheduledTxMs + serializationDelayMs;
@@ -48,7 +52,11 @@ bool VirtualNetwork::submit(Datagram datagram, std::uint64_t nowMs) {
     datagram.deliverAtMs = scheduledTxMs + serializationDelayMs + baseDelay;
 
     if (profile_.mode == TransportMode::Udp && probability_(rng_) < profile_.reorderPercent) {
-        const std::uint64_t advanceMs = std::min<std::uint64_t>(profile_.latencyMs / 2U, datagram.deliverAtMs - nowMs);
+        const std::uint64_t advanceMs = std::min<std::uint64_t>(
+            profile_.latencyMs / 2U,
+            datagram.deliverAtMs - nowMs
+        );
+
         datagram.deliverAtMs -= advanceMs;
     }
 
@@ -69,12 +77,14 @@ std::vector<Datagram> VirtualNetwork::pollReady(std::uint64_t nowMs) {
             remaining.push_back(std::move(datagram));
         }
     }
+
     queue_ = std::move(remaining);
 
     std::sort(ready.begin(), ready.end(), [](const Datagram& left, const Datagram& right) {
         if (left.deliverAtMs == right.deliverAtMs) {
             return left.serialNumber < right.serialNumber;
         }
+
         return left.deliverAtMs < right.deliverAtMs;
     });
 

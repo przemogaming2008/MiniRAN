@@ -12,9 +12,13 @@ struct FlowMetrics {
     std::size_t packetsDelivered = 0;
     std::size_t packetsDropped = 0;
 
+    std::size_t packetsDroppedByLoss = 0;
+    std::size_t packetsDroppedByQueue = 0;
+
     double throughputMbps(std::size_t durationMs) const;
     double deliveryRatio() const;
 };
+
 struct UeProtocolMetrics {
     std::uint32_t attachRetries = 0;
     std::uint32_t detachRetries = 0;

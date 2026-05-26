@@ -1,9 +1,11 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
+#include "miniran/common/metrics.h"
 #include "miniran/protocol/protocol_message.h"
 
 namespace miniran {
@@ -35,6 +37,7 @@ inline std::string toString(SessionEndReason reason) {
         case SessionEndReason::Error:
             return "error";
     }
+
     return "unknown";
 }
 
@@ -51,15 +54,14 @@ struct UeSimulationResult {
     SessionState finalUeState = SessionState::Idle;
     SessionEndReason endReason = SessionEndReason::None;
 
-    std::uint32_t attachRetries = 0;
-    std::uint32_t detachRetries = 0;
-
-    std::size_t heartbeatsSent = 0;
-    std::size_t heartbeatAcksReceived = 0;
+    UeProtocolMetrics protocolMetrics{};
 
     // Uplink: UE -> CoreNetwork.
     std::size_t uplinkPacketsGenerated = 0;
     std::size_t uplinkBytesGenerated = 0;
+
+    std::size_t uplinkPacketsSkippedNoSession = 0;
+    std::size_t uplinkBytesSkippedNoSession = 0;
 
     std::size_t uplinkPacketsSent = 0;
     std::size_t uplinkBytesSent = 0;
@@ -70,8 +72,12 @@ struct UeSimulationResult {
     std::size_t uplinkPacketsAcceptedByCore = 0;
     std::size_t uplinkBytesAcceptedByCore = 0;
 
+    // Downlink: CoreNetwork / AccessNode -> UE.
     std::size_t downlinkPacketsGenerated = 0;
     std::size_t downlinkBytesGenerated = 0;
+
+    std::size_t downlinkPacketsSkippedNoSession = 0;
+    std::size_t downlinkBytesSkippedNoSession = 0;
 
     std::size_t downlinkPacketsSent = 0;
     std::size_t downlinkBytesSent = 0;
@@ -103,6 +109,8 @@ struct SimulationResult {
     std::size_t uplinkPacketsAcceptedByCore = 0;
     std::size_t uplinkBytesAcceptedByCore = 0;
 
+    std::uint64_t protocolRejectedPackets = 0;
+
     std::size_t downlinkPacketsDeliveredToUe = 0;
     std::size_t downlinkBytesDeliveredToUe = 0;
 
@@ -113,8 +121,7 @@ struct SimulationResult {
     std::vector<std::string> notes;
 
     std::string summary() const;
+    bool succeeded() const;
 };
-
-
 
 }  // namespace miniran

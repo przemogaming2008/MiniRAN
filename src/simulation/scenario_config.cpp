@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <exception>
+#include <limits>
 
 namespace miniran {
 
@@ -59,46 +60,127 @@ std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, 
 
     auto parseUnsigned = [&](const std::string& key, std::uint64_t& target) -> bool {
         if (const auto value = readValue(values, key)) {
+            if (value->empty()) {
+                error = "Empty unsigned integer value for key: " + key;
+                return false;
+            }
+
+            if ((*value)[0] == '-') {
+                error = "Negative value is not allowed for key: " + key;
+                return false;
+            }
+
             try {
-                target = std::stoull(*value);
+                std::size_t pos = 0;
+                const auto parsed = std::stoull(*value, &pos);
+
+                if (pos != value->size()) {
+                    error = "Invalid unsigned integer suffix for key: " + key;
+                    return false;
+                }
+
+                target = parsed;
             } catch (const std::exception&) {
                 error = "Invalid unsigned integer value for key: " + key;
                 return false;
             }
         }
+
         return true;
     };
     auto parseUnsigned32 = [&](const std::string& key, std::uint32_t& target) -> bool {
         if (const auto value = readValue(values, key)) {
+            if (value->empty()) {
+                error = "Empty uint32 value for key: " + key;
+                return false;
+            }
+
+            if ((*value)[0] == '-') {
+                error = "Negative value is not allowed for key: " + key;
+                return false;
+            }
+
             try {
-                target = static_cast<std::uint32_t>(std::stoul(*value));
+                std::size_t pos = 0;
+                const auto parsed = std::stoull(*value, &pos);
+
+                if (pos != value->size()) {
+                    error = "Invalid uint32 suffix for key: " + key;
+                    return false;
+                }
+
+                if (parsed > std::numeric_limits<std::uint32_t>::max()) {
+                    error = "Value is too large for uint32 key: " + key;
+                    return false;
+                }
+
+                target = static_cast<std::uint32_t>(parsed);
             } catch (const std::exception&) {
                 error = "Invalid uint32 value for key: " + key;
                 return false;
             }
         }
+
         return true;
     };
     auto parseSize = [&](const std::string& key, std::size_t& target) -> bool {
         if (const auto value = readValue(values, key)) {
+            if (value->empty()) {
+                error = "Empty size value for key: " + key;
+                return false;
+            }
+
+            if ((*value)[0] == '-') {
+                error = "Negative value is not allowed for key: " + key;
+                return false;
+            }
+
             try {
-                target = static_cast<std::size_t>(std::stoull(*value));
+                std::size_t pos = 0;
+                const auto parsed = std::stoull(*value, &pos);
+
+                if (pos != value->size()) {
+                    error = "Invalid size suffix for key: " + key;
+                    return false;
+                }
+
+                if (parsed > std::numeric_limits<std::size_t>::max()) {
+                    error = "Value is too large for size key: " + key;
+                    return false;
+                }
+
+                target = static_cast<std::size_t>(parsed);
             } catch (const std::exception&) {
                 error = "Invalid size value for key: " + key;
                 return false;
             }
         }
+
         return true;
     };
     auto parseDouble = [&](const std::string& key, double& target) -> bool {
         if (const auto value = readValue(values, key)) {
+            if (value->empty()) {
+                error = "Empty double value for key: " + key;
+                return false;
+            }
+
             try {
-                target = std::stod(*value);
+                std::size_t pos = 0;
+                const auto parsed = std::stod(*value, &pos);
+
+                if (pos != value->size()) {
+                    error = "Invalid double suffix for key: " + key;
+                    return false;
+                }
+
+                target = parsed;
             } catch (const std::exception&) {
                 error = "Invalid double value for key: " + key;
                 return false;
             }
         }
+
         return true;
     };
     auto parseBool = [&](const std::string& key, bool& target) -> bool {

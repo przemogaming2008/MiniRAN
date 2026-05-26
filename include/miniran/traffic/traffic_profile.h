@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -23,6 +24,7 @@ inline std::string toString(TrafficPattern pattern) {
         case TrafficPattern::Ramp:
             return "ramp";
     }
+
     return "unknown";
 }
 
@@ -30,12 +32,15 @@ inline std::optional<TrafficPattern> parseTrafficPattern(std::string_view value)
     if (value == "cbr") {
         return TrafficPattern::ConstantBitrate;
     }
+
     if (value == "bursty") {
         return TrafficPattern::Bursty;
     }
+
     if (value == "ramp") {
         return TrafficPattern::Ramp;
     }
+
     return std::nullopt;
 }
 
@@ -67,7 +72,7 @@ struct TrafficProfile {
 
         return false;
     }
-    };
+};
 
 struct TrafficEvent {
     std::uint64_t timestampMs = 0;

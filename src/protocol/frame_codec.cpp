@@ -9,8 +9,28 @@ namespace miniran {
 namespace {
 constexpr std::uint8_t kProtocolVersion = 1;
 constexpr std::uint8_t kHeaderLength = 28;
-}  // namespace
 
+bool isKnownMessageType(std::uint8_t value) {
+    switch (static_cast<MessageType>(value)) {
+        case MessageType::AttachRequest:
+        case MessageType::AttachAccept:
+        case MessageType::AttachReject:
+        case MessageType::Heartbeat:
+        case MessageType::HeartbeatAck:
+        case MessageType::Data:
+        case MessageType::DetachRequest:
+        case MessageType::DetachAccept:
+        case MessageType::Error:
+        case MessageType::DataAck:
+        case MessageType::DownlinkData:
+        case MessageType::StatsRequest:
+        case MessageType::StatsResponse:
+            return true;
+    }
+
+    return false;
+}
+}  // namespace
 std::string toString(MessageType type) {
     switch (type) {
         case MessageType::AttachRequest:
@@ -31,7 +51,16 @@ std::string toString(MessageType type) {
             return "DetachAccept";
         case MessageType::Error:
             return "Error";
+        case MessageType::DataAck:
+            return "DataAck";
+        case MessageType::DownlinkData:
+            return "DownlinkData";
+        case MessageType::StatsRequest:
+            return "StatsRequest";
+        case MessageType::StatsResponse:
+            return "StatsResponse";
     }
+
     return "Unknown";
 }
 
@@ -114,7 +143,13 @@ std::optional<ProtocolMessage> FrameCodec::decode(const std::vector<std::uint8_t
         error = stream.str();
         return std::nullopt;
     }
-
+    
+    if (!isKnownMessageType(messageType)) {
+        std::ostringstream stream;
+        stream << "Unknown message type: " << static_cast<int>(messageType);
+        error = stream.str();
+    return std::nullopt;
+}
     message.header.messageType = static_cast<MessageType>(messageType);
 
     if (!reader.readBytes(message.header.payloadLength, message.payload)) {

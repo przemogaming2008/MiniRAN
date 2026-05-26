@@ -27,6 +27,7 @@ public:
 
     SessionState state() const;
     bool isAttached() const;
+    bool detachConfirmed() const;
 
     const FlowMetrics& uplinkMetrics() const;
     const FlowMetrics& downlinkMetrics() const;
@@ -52,6 +53,5 @@ private:
 
     std::deque<Datagram> outgoing_;
 };
-
 
 }  // namespace miniran

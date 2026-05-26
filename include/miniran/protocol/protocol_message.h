@@ -16,6 +16,11 @@ enum class MessageType : std::uint8_t {
     DetachRequest = 7,
     DetachAccept = 8,
     Error = 9,
+
+    DataAck = 10,
+    DownlinkData = 11,
+    StatsRequest = 12,
+    StatsResponse = 13,
 };
 
 enum class SessionState : std::uint8_t {
