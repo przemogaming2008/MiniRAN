@@ -265,8 +265,8 @@ SimulationResult ScenarioRunner::run() {
         nowMs += config_.stepMs;
     }
 
-    result.totalDurationMs = nowMs;
-
+    result.totalDurationMs = config_.scenarioDurationMs;
+    
     result.packetsDroppedInNetwork = network.metrics().packetsDropped;
     result.packetsDroppedByLoss = network.metrics().packetsDroppedByLoss;
     result.packetsDroppedByQueue = network.metrics().packetsDroppedByQueue;
