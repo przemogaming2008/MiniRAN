@@ -27,6 +27,8 @@ std::optional<std::string> readValue(const std::unordered_map<std::string, std::
     }
     return it->second;
 }
+
+}  // namespace
 bool ScenarioConfig::validate(std::string& error) const {
     if (stepMs == 0) {
         error = "step_ms must be greater than 0.";
@@ -99,7 +101,6 @@ bool ScenarioConfig::validate(std::string& error) const {
     error.clear();
     return true;
 }
-}  // namespace
 
 std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, std::string& error) {
     std::ifstream input(path);

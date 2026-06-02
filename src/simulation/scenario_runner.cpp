@@ -1,5 +1,6 @@
 #include "miniran/simulation/scenario_runner.h"
 
+#include <optional>
 #include <utility>
 #include <vector>
 #include <string>
@@ -8,6 +9,7 @@
 #include "miniran/protocol/protocol_message.h"
 #include "miniran/traffic/traffic_generator.h"
 #include "miniran/transport/virtual_network.h"
+#include "miniran/core/core_network.h"
 
 namespace miniran {
 
@@ -43,6 +45,49 @@ void deliverReady(VirtualNetwork& network, std::vector<Ue>& ues, AccessNode& acc
     }
 }
 
+SessionEndReason mapCoreEndReason(CoreSessionEndReason reason) {
+    switch (reason) {
+        case CoreSessionEndReason::None:
+            return SessionEndReason::None;
+
+        case CoreSessionEndReason::CleanDetach:
+            return SessionEndReason::CleanDetach;
+
+        case CoreSessionEndReason::InactivityTimeout:
+            return SessionEndReason::InactivityTimeout;
+
+        case CoreSessionEndReason::ProtocolError:
+        case CoreSessionEndReason::RetryLimitExceeded:
+            return SessionEndReason::Error;
+    }
+
+    return SessionEndReason::Error;
+}
+
+const SessionRecord* findLatestSessionRecord(
+    const CoreNetwork& coreNetwork,
+    std::uint32_t ueId,
+    std::uint32_t sessionId
+) {
+    const auto& history = coreNetwork.sessionHistory();
+    const auto historyIt = history.find(ueId);
+
+    if (historyIt == history.end() || historyIt->second.empty()) {
+        return nullptr;
+    }
+
+    const auto& records = historyIt->second;
+
+    if (sessionId != 0) {
+        for (auto it = records.rbegin(); it != records.rend(); ++it) {
+            if (it->sessionId == sessionId) {
+                return &(*it);
+            }
+        }
+    }
+
+    return &records.back();
+}
 }  // namespace
 
 ScenarioRunner::ScenarioRunner(ScenarioConfig config) : config_(std::move(config)) {}
@@ -287,9 +332,26 @@ SimulationResult ScenarioRunner::run() {
         result.downlinkPacketsDeliveredToUe += result.ueResults[i].downlinkPacketsReceivedByUe;
         result.downlinkBytesDeliveredToUe += result.ueResults[i].downlinkBytesReceivedByUe;
 
+        const SessionRecord* coreRecord = findLatestSessionRecord(
+            accessNode.coreNetwork(),
+            ueConfig.ueId,
+            result.ueResults[i].sessionId
+        );
+
+        const SessionEndReason coreEndReason =
+            (coreRecord == nullptr)
+                ? SessionEndReason::None
+                : mapCoreEndReason(coreRecord->endReason);
+
         if (result.ueResults[i].detachSucceeded) {
             ++result.cleanlyDetachedSessions;
             result.ueResults[i].endReason = SessionEndReason::CleanDetach;
+        } else if (coreEndReason == SessionEndReason::InactivityTimeout) {
+            result.ueResults[i].endReason = SessionEndReason::InactivityTimeout;
+            result.ueResults[i].notes.push_back("Core session expired due to inactivity timeout.");
+        } else if (coreEndReason == SessionEndReason::Error) {
+            result.ueResults[i].endReason = SessionEndReason::Error;
+            result.ueResults[i].notes.push_back("Core ended the session because of a protocol error.");
         } else if (!result.ueResults[i].attachSucceeded) {
             result.ueResults[i].endReason = SessionEndReason::AttachFailed;
             result.ueResults[i].notes.push_back("Attach did not succeed.");
