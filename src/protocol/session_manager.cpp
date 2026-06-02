@@ -66,6 +66,10 @@ bool SessionManager::onAttachAccepted(std::uint32_t sessionId, std::uint64_t now
         return false;
     }
 
+    if (sessionId == 0) {
+        return false;
+    }
+
     sessionId_ = sessionId;
     lastSessionId_ = sessionId_;
 

@@ -208,7 +208,26 @@ void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
     }
 
     if (protocolMessage.header.messageType == MessageType::AttachAccept) {
-        sessionManager_.onAttachAccepted(protocolMessage.header.sessionId, nowMs);
+        if (sessionManager_.state() != SessionState::Attaching) {
+            protocolMetrics_.invalidMessagesDropped += 1;
+            return;
+        }
+
+        if (protocolMessage.header.sessionId == 0) {
+            protocolMetrics_.protocolErrorsReceived += 1;
+            return;
+        }
+
+        if (protocolMessage.header.payloadLength != 0 || !protocolMessage.payload.empty()) {
+            protocolMetrics_.invalidMessagesDropped += 1;
+            return;
+        }
+
+        if (!sessionManager_.onAttachAccepted(protocolMessage.header.sessionId, nowMs)) {
+            protocolMetrics_.protocolErrorsReceived += 1;
+            return;
+        }
+
         return;
     }
 
