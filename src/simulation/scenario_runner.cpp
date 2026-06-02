@@ -2,7 +2,7 @@
 
 #include <utility>
 #include <vector>
-
+#include <string>
 #include "miniran/nodes/access_node.h"
 #include "miniran/nodes/ue.h"
 #include "miniran/protocol/protocol_message.h"
@@ -48,8 +48,16 @@ void deliverReady(VirtualNetwork& network, std::vector<Ue>& ues, AccessNode& acc
 ScenarioRunner::ScenarioRunner(ScenarioConfig config) : config_(std::move(config)) {}
 
 SimulationResult ScenarioRunner::run() {
+
     SimulationResult result;
     result.scenarioName = config_.scenarioName;
+
+    std::string validationError;
+    if (!config_.validate(validationError)) {
+        result.notes.push_back("Invalid scenario config: " + validationError);
+        return result;
+    }
+
     result.ueCount = config_.ueConfigs.size();
 
     std::vector<Ue> ues;

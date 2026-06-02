@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 #include "miniran/protocol/session_manager.h"
 #include "miniran/traffic/traffic_profile.h"
@@ -44,6 +45,7 @@ struct ScenarioConfig {
     std::vector<UeConfig> ueConfigs{{}};
 
     static std::optional<ScenarioConfig> fromFile(const std::string& path, std::string& error);
+    bool validate(std::string& error) const;
 };
 
 }  // namespace miniran

@@ -27,7 +27,78 @@ std::optional<std::string> readValue(const std::unordered_map<std::string, std::
     }
     return it->second;
 }
+bool ScenarioConfig::validate(std::string& error) const {
+    if (stepMs == 0) {
+        error = "step_ms must be greater than 0.";
+        return false;
+    }
 
+    if (scenarioDurationMs == 0) {
+        error = "scenario_duration_ms must be greater than 0.";
+        return false;
+    }
+
+    if (!linkProfile.isValid()) {
+        error = "Invalid link profile.";
+        return false;
+    }
+
+    if (ueConfigs.empty()) {
+        error = "At least one UE must be configured.";
+        return false;
+    }
+
+    std::unordered_set<std::uint32_t> usedNodeIds;
+    std::unordered_set<std::uint32_t> usedUeIds;
+
+    for (std::size_t i = 0; i < ueConfigs.size(); ++i) {
+        const auto& ueConfig = ueConfigs[i];
+
+        if (ueConfig.nodeId == 0) {
+            error = "UE node_id must be non-zero.";
+            return false;
+        }
+
+        if (ueConfig.ueId == 0) {
+            error = "UE ue_id must be non-zero.";
+            return false;
+        }
+
+        if (ueConfig.nodeId == accessNodeId) {
+            error = "UE node_id must be different from access_node_id.";
+            return false;
+        }
+
+        if (!usedNodeIds.insert(ueConfig.nodeId).second) {
+            error = "Duplicate UE node_id.";
+            return false;
+        }
+
+        if (!usedUeIds.insert(ueConfig.ueId).second) {
+            error = "Duplicate UE ue_id.";
+            return false;
+        }
+
+        if (ueConfig.trafficEndMs <= ueConfig.trafficStartMs) {
+            error = "UE traffic_end_ms must be greater than traffic_start_ms.";
+            return false;
+        }
+
+        if (!ueConfig.uplinkTrafficProfile.isValid()) {
+            error = "Invalid uplink traffic profile.";
+            return false;
+        }
+
+        if (ueConfig.downlinkEnabled &&
+            !ueConfig.downlinkTrafficProfile.isValid()) {
+            error = "Invalid downlink traffic profile.";
+            return false;
+        }
+    }
+
+    error.clear();
+    return true;
+}
 }  // namespace
 
 std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, std::string& error) {
@@ -346,6 +417,10 @@ std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, 
     }
 
     error.clear();
+    if (!config.validate(error)) {
+        return std::nullopt;
+    }
+
     return config;
 }
 
