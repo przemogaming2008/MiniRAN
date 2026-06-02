@@ -114,6 +114,7 @@ SimulationResult ScenarioRunner::run() {
     std::vector<std::size_t> downlinkEventIndexes;
 
     std::vector<bool> attachStarted;
+    std::vector<bool> detachRequested;
     std::vector<bool> detachStarted;
 
     for (const auto& ueConfig : config_.ueConfigs) {
@@ -165,6 +166,7 @@ SimulationResult ScenarioRunner::run() {
         downlinkEventIndexes.push_back(0);
 
         attachStarted.push_back(false);
+        detachRequested.push_back(false);
         detachStarted.push_back(false);
     }
 
@@ -246,7 +248,11 @@ SimulationResult ScenarioRunner::run() {
                 }
             }
 
-            if (!detachStarted[i] && nowMs >= ueConfig.trafficEndMs && ues[i].isAttached()) {
+            if (!detachRequested[i] && nowMs >= ueConfig.trafficEndMs) {
+                detachRequested[i] = true;
+            }
+
+            if (detachRequested[i] && !detachStarted[i] && ues[i].isAttached()) {
                 ues[i].startDetach(nowMs);
                 detachStarted[i] = true;
             }
@@ -266,7 +272,7 @@ SimulationResult ScenarioRunner::run() {
     }
 
     result.totalDurationMs = config_.scenarioDurationMs;
-    
+
     result.packetsDroppedInNetwork = network.metrics().packetsDropped;
     result.packetsDroppedByLoss = network.metrics().packetsDroppedByLoss;
     result.packetsDroppedByQueue = network.metrics().packetsDroppedByQueue;
