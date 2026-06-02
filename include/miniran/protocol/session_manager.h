@@ -6,6 +6,14 @@
 
 namespace miniran {
 
+enum class UeSessionEndReason {
+    None,
+    CleanDetach,
+    AttachFailed,
+    DetachNotConfirmed,
+    InactivityTimeout
+};
+
 struct SessionTimers {
     std::uint32_t attachTimeoutMs = 150;
     std::uint32_t detachTimeoutMs = 150;
@@ -42,6 +50,8 @@ public:
     RetryDecision onTick(std::uint64_t nowMs);
     void reset();
 
+    UeSessionEndReason endReason() const;
+
 private:
     std::uint32_t ueId_ = 0;
     SessionTimers timers_{};
@@ -59,6 +69,8 @@ private:
     std::uint32_t lastSessionId_ = 0;
     
     bool detachConfirmed_ = false;
+
+    UeSessionEndReason endReason_ = UeSessionEndReason::None;
 };
 
 }  // namespace miniran

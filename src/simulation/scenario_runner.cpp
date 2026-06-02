@@ -45,6 +45,27 @@ void deliverReady(VirtualNetwork& network, std::vector<Ue>& ues, AccessNode& acc
     }
 }
 
+SessionEndReason mapUeEndReason(UeSessionEndReason reason) {
+    switch (reason) {
+        case UeSessionEndReason::None:
+            return SessionEndReason::None;
+
+        case UeSessionEndReason::CleanDetach:
+            return SessionEndReason::CleanDetach;
+
+        case UeSessionEndReason::AttachFailed:
+            return SessionEndReason::AttachFailed;
+
+        case UeSessionEndReason::DetachNotConfirmed:
+            return SessionEndReason::DetachNotConfirmed;
+
+        case UeSessionEndReason::InactivityTimeout:
+            return SessionEndReason::InactivityTimeout;
+    }
+
+    return SessionEndReason::Error;
+}
+
 SessionEndReason mapCoreEndReason(CoreSessionEndReason reason) {
     switch (reason) {
         case CoreSessionEndReason::None:
@@ -349,15 +370,38 @@ SimulationResult ScenarioRunner::run() {
                 ? SessionEndReason::None
                 : mapCoreEndReason(coreRecord->endReason);
 
+        const SessionEndReason ueEndReason = mapUeEndReason(ues[i].endReason());
+
         if (result.ueResults[i].detachSucceeded) {
             ++result.cleanlyDetachedSessions;
             result.ueResults[i].endReason = SessionEndReason::CleanDetach;
-        } else if (coreEndReason == SessionEndReason::InactivityTimeout) {
+        } else if (coreEndReason == SessionEndReason::InactivityTimeout ||
+                ueEndReason == SessionEndReason::InactivityTimeout) {
             result.ueResults[i].endReason = SessionEndReason::InactivityTimeout;
-            result.ueResults[i].notes.push_back("Core session expired due to inactivity timeout.");
+
+            if (coreEndReason == SessionEndReason::InactivityTimeout &&
+                ueEndReason == SessionEndReason::InactivityTimeout) {
+                result.ueResults[i].notes.push_back(
+                    "Session expired due to inactivity timeout on both UE and Core side."
+                );
+            } else if (coreEndReason == SessionEndReason::InactivityTimeout) {
+                result.ueResults[i].notes.push_back(
+                    "Core session expired due to inactivity timeout."
+                );
+            } else {
+                result.ueResults[i].notes.push_back(
+                    "UE session expired due to missing heartbeat ACK."
+                );
+            }
         } else if (coreEndReason == SessionEndReason::Error) {
             result.ueResults[i].endReason = SessionEndReason::Error;
             result.ueResults[i].notes.push_back("Core ended the session because of a protocol error.");
+        } else if (ueEndReason == SessionEndReason::AttachFailed) {
+            result.ueResults[i].endReason = SessionEndReason::AttachFailed;
+            result.ueResults[i].notes.push_back("Attach did not succeed.");
+        } else if (ueEndReason == SessionEndReason::DetachNotConfirmed) {
+            result.ueResults[i].endReason = SessionEndReason::DetachNotConfirmed;
+            result.ueResults[i].notes.push_back("Detach was not confirmed cleanly.");
         } else if (!result.ueResults[i].attachSucceeded) {
             result.ueResults[i].endReason = SessionEndReason::AttachFailed;
             result.ueResults[i].notes.push_back("Attach did not succeed.");

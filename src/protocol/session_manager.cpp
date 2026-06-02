@@ -37,6 +37,10 @@ std::uint32_t SessionManager::nextSequenceNumber() {
     return nextSequenceNumber_++;
 }
 
+UeSessionEndReason SessionManager::endReason() const {
+    return endReason_;
+}
+
 bool SessionManager::beginAttach(std::uint64_t nowMs) {
     if (state_ == SessionState::Idle ||
         state_ == SessionState::Released ||
@@ -50,6 +54,8 @@ bool SessionManager::beginAttach(std::uint64_t nowMs) {
         attachRetryCount_ = 0;
         detachRetryCount_ = 0;
         detachConfirmed_ = false;
+        
+        endReason_ = UeSessionEndReason::None;
 
         lastControlTxMs_ = nowMs;
         lastHeartbeatAckMs_ = nowMs;
@@ -109,6 +115,8 @@ bool SessionManager::onDetachAccepted(std::uint64_t nowMs) {
     sessionId_ = 0;
 
     state_ = SessionState::Released;
+    
+    endReason_ = UeSessionEndReason::CleanDetach;
 
     lastControlTxMs_ = nowMs;
     lastHeartbeatAckMs_ = nowMs;
@@ -135,6 +143,7 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
         sessionId_ = 0;
         attachRetryCount_ = 0;
         detachConfirmed_ = false;
+        endReason_ = UeSessionEndReason::AttachFailed;
         return {};
     }
 
@@ -153,6 +162,7 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
         state_ = SessionState::Released;
         detachConfirmed_ = false;
         detachRetryCount_ = 0;
+        endReason_ = UeSessionEndReason::DetachNotConfirmed;
         return {};
     }
 
@@ -164,6 +174,7 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
 
         state_ = SessionState::Released;
         detachConfirmed_ = false;
+        endReason_ = UeSessionEndReason::InactivityTimeout;
         return {};
     }
 
@@ -179,6 +190,8 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
 
 void SessionManager::reset() {
     state_ = SessionState::Idle;
+
+    endReason_ = UeSessionEndReason::None;
 
     sessionId_ = 0;
     lastSessionId_ = 0;

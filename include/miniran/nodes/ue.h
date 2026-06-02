@@ -40,6 +40,7 @@ public:
     void onDatagram(const Datagram& datagram, std::uint64_t nowMs);
     std::vector<Datagram> flushOutgoing();
     std::uint32_t lastSessionId() const;
+    UeSessionEndReason endReason() const;
 private:
     std::uint32_t nodeId_ = 0;
     std::uint32_t ueId_ = 0;

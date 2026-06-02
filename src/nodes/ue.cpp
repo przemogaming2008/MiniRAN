@@ -61,6 +61,10 @@ const UeProtocolMetrics& Ue::protocolMetrics() const {
     return protocolMetrics_;
 }
 
+UeSessionEndReason Ue::endReason() const {
+    return sessionManager_.endReason();
+}
+
 void Ue::startAttach(std::uint64_t nowMs) {
     if (sessionManager_.beginAttach(nowMs)) {
         ProtocolMessage msg = makeMessage(
