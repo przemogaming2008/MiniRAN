@@ -43,9 +43,6 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
 
     ProtocolMessage protocolMessage = *decode_opt;
 
-    if (protocolMessage.header.ueId != 0) {
-        rememberUeRoute(protocolMessage.header.ueId, datagram.fromNodeId);
-    }
 
     //Route messages by type:
     //    - AttachRequest  -> coreNetwork_.handleAttachRequest()
@@ -53,50 +50,63 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
     //    - Data           -> coreNetwork_.handleData()
     //    - DetachRequest  -> coreNetwork_.handleDetachRequest()
     if (protocolMessage.header.messageType == MessageType::AttachRequest) {
-        metrics_.packetsDelivered += 1;
+        ++metrics_.packetsDelivered;
         metrics_.bytesDelivered += datagram.bytes.size();
 
-        std::optional<ProtocolMessage> msg_opt =
-            coreNetwork_.handleAttachRequest(protocolMessage, nowMs);
+        auto response = coreNetwork_.handleAttachRequest(protocolMessage, nowMs);
 
-        if (msg_opt) {
-            queueResponseToUe(*msg_opt, nowMs, datagram.fromNodeId);
+        if (response) {
+            if (response->header.messageType == MessageType::AttachAccept) {
+                rememberUeRoute(protocolMessage.header.ueId, datagram.fromNodeId);
+            }
+
+            queueResponseToUe(*response, nowMs, datagram.fromNodeId);
         }
 
         return;
     }
 
     if (protocolMessage.header.messageType == MessageType::Heartbeat) {
-        metrics_.packetsDelivered += 1;
+        ++metrics_.packetsDelivered;
         metrics_.bytesDelivered += datagram.bytes.size();
 
-        std::optional<ProtocolMessage> msg_opt =
-            coreNetwork_.handleHeartbeat(protocolMessage, nowMs);
+        if (coreNetwork_.hasActiveSession(protocolMessage.header.ueId)) {
+            rememberUeRoute(protocolMessage.header.ueId, datagram.fromNodeId);
+        }
 
-        if (msg_opt) {
-            queueResponseToUe(*msg_opt, nowMs, datagram.fromNodeId);
+        auto response = coreNetwork_.handleHeartbeat(protocolMessage, nowMs);
+
+        if (response) {
+            queueResponseToUe(*response, nowMs, datagram.fromNodeId);
         }
 
         return;
     }
 
     if (protocolMessage.header.messageType == MessageType::Data) {
-        metrics_.packetsDelivered += 1;
+        ++metrics_.packetsDelivered;
         metrics_.bytesDelivered += datagram.bytes.size();
+
+        if (coreNetwork_.hasActiveSession(protocolMessage.header.ueId)) {
+            rememberUeRoute(protocolMessage.header.ueId, datagram.fromNodeId);
+        }
 
         coreNetwork_.handleData(protocolMessage, nowMs);
         return;
     }
 
     if (protocolMessage.header.messageType == MessageType::DetachRequest) {
-        metrics_.packetsDelivered += 1;
+        ++metrics_.packetsDelivered;
         metrics_.bytesDelivered += datagram.bytes.size();
 
-        std::optional<ProtocolMessage> msg_opt =
-            coreNetwork_.handleDetachRequest(protocolMessage, nowMs);
+        if (coreNetwork_.hasActiveSession(protocolMessage.header.ueId)) {
+            rememberUeRoute(protocolMessage.header.ueId, datagram.fromNodeId);
+        }
 
-        if (msg_opt) {
-            queueResponseToUe(*msg_opt, nowMs, datagram.fromNodeId);
+        auto response = coreNetwork_.handleDetachRequest(protocolMessage, nowMs);
+
+        if (response) {
+            queueResponseToUe(*response, nowMs, datagram.fromNodeId);
         }
 
         return;
