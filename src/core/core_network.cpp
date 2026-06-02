@@ -88,37 +88,60 @@ std::optional<ProtocolMessage> CoreNetwork::handleAttachRequest(const ProtocolMe
 }
 
 std::optional<ProtocolMessage> CoreNetwork::handleDetachRequest(const ProtocolMessage& request, std::uint64_t nowMs) {
-
     if (request.header.messageType != MessageType::DetachRequest) {
-        return std::nullopt;
-    }
-
-    ProtocolMessage protocolMessage = ProtocolMessage{};
-    protocolMessage.header.timestampMs = nowMs;
-    protocolMessage.header.ueId = request.header.ueId;
-    protocolMessage.header.sequenceNumber = request.header.sequenceNumber;
-    protocolMessage.header.sessionId = request.header.sessionId;
-
-    auto it = sessions_.find(request.header.ueId);
-
-    if (it == sessions_.end()) {
-        protocolMessage.header.messageType = MessageType::DetachAccept;
-        return protocolMessage;
-    }
-
-    if (it->second.sessionId != request.header.sessionId) {
-        ++it->second.protocolErrors;
         countProtocolRejection(request.header.ueId);
 
-        protocolMessage.header.messageType = MessageType::Error;
-        return protocolMessage;
+        return makeMessage(
+            MessageType::Error,
+            request.header.ueId,
+            request.header.sessionId,
+            request.header.sequenceNumber,
+            nowMs
+        );
     }
 
-    storeFinishedSession(it->second, CoreSessionEndReason::CleanDetach, nowMs);
-    sessions_.erase(it);
+    const auto ueId = request.header.ueId;
+    auto sessionIt = sessions_.find(ueId);
 
-    protocolMessage.header.messageType = MessageType::DetachAccept;
-    return protocolMessage;
+    if (sessionIt == sessions_.end()) {
+        countProtocolRejection(ueId);
+
+        return makeMessage(
+            MessageType::Error,
+            ueId,
+            request.header.sessionId,
+            request.header.sequenceNumber,
+            nowMs
+        );
+    }
+
+    auto& session = sessionIt->second;
+
+    if (request.header.sessionId == 0 ||
+        request.header.sessionId != session.sessionId) {
+
+        session.protocolErrors += 1;
+        countProtocolRejection(ueId);
+
+        return makeMessage(
+            MessageType::Error,
+            ueId,
+            request.header.sessionId,
+            request.header.sequenceNumber,
+            nowMs
+        );
+    }
+
+    storeFinishedSession(session, CoreSessionEndReason::CleanDetach, nowMs);
+    sessions_.erase(sessionIt);
+
+    return makeMessage(
+        MessageType::DetachAccept,
+        ueId,
+        request.header.sessionId,
+        request.header.sequenceNumber,
+        nowMs
+    );
 }
 
 std::optional<ProtocolMessage> CoreNetwork::handleHeartbeat(const ProtocolMessage& request, std::uint64_t nowMs) {

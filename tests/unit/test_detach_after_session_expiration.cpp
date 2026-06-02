@@ -33,5 +33,5 @@ TEST_CASE(detach_after_session_expiration){
     //Idempotent detach: missing session => DetachAccept
     auto detachResponse = core.handleDetachRequest(detach, 260);
     ASSERT_TRUE(detachResponse.has_value());
-    ASSERT_EQ(detachResponse->header.messageType, MessageType::DetachAccept);
+    ASSERT_EQ(detachResponse->header.messageType, MessageType::Error);
 }
