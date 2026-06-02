@@ -141,11 +141,7 @@ SimulationResult ScenarioRunner::run() {
                        ueConfig.trafficStartMs + events[eventIndex].timestampMs <= nowMs) {
 
                     if (!ues[i].isAttached()) {
-                        result.ueResults[i].uplinkPacketsSkippedNoSession += 1;
-                        result.ueResults[i].uplinkBytesSkippedNoSession += events[eventIndex].payload.size();
-
-                        ++eventIndex;
-                        continue;
+                        break;
                     }
 
                     const auto packetsBefore = ues[i].uplinkMetrics().packetsSent;
@@ -174,11 +170,7 @@ SimulationResult ScenarioRunner::run() {
 
                     if (!ues[i].isAttached() ||
                         !accessNode.coreNetwork().hasActiveSession(ueConfig.ueId)) {
-                        result.ueResults[i].downlinkPacketsSkippedNoSession += 1;
-                        result.ueResults[i].downlinkBytesSkippedNoSession += events[eventIndex].payload.size();
-
-                        ++eventIndex;
-                        continue;
+                        break;
                     }
 
                     ProtocolMessage message = makeMessage(
