@@ -104,6 +104,27 @@ std::optional<ProtocolMessage> CoreNetwork::handleDetachRequest(const ProtocolMe
     auto sessionIt = sessions_.find(ueId);
 
     if (sessionIt == sessions_.end()) {
+        const auto historyIt = sessionHistory_.find(ueId);
+
+        if (historyIt != sessionHistory_.end()) {
+            for (auto recordIt = historyIt->second.rbegin();
+                recordIt != historyIt->second.rend();
+                ++recordIt) {
+
+                if (recordIt->sessionId == request.header.sessionId &&
+                    recordIt->endReason == CoreSessionEndReason::CleanDetach) {
+
+                    return makeMessage(
+                        MessageType::DetachAccept,
+                        ueId,
+                        request.header.sessionId,
+                        request.header.sequenceNumber,
+                        nowMs
+                    );
+                }
+            }
+        }
+
         countProtocolRejection(ueId);
 
         return makeMessage(
