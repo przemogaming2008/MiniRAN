@@ -54,6 +54,10 @@ if(MINIRAN_BUILD_TESTS)
         tests/component/test_udp_stability.cpp
         tests/component/test_udp_higher_loss.cpp
         tests/component/test_udp_low_bandwidth_limits_throughput.cpp
+        tests/component/test_multi_ue_tcp_uplink_downlink.cpp
+        tests/component/test_multi_ue_independent_detach.cpp
+        tests/component/test_duplicate_ue_config_rejected.cpp
+        tests/component/test_reattach_after_detach.cpp
     )
     target_link_libraries(miniran_tests PRIVATE miniran_lib)
     target_include_directories(miniran_tests PRIVATE tests)
