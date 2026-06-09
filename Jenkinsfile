@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    environment {
+        PATH = "C:\\msys64\\mingw64\\bin;${env.PATH}"
+    }
+
     stages {
         stage('Clean') {
             steps {
@@ -10,7 +14,7 @@ pipeline {
 
         stage('Configure') {
             steps {
-                bat 'cmake -S . -B build'
+                bat 'cmake -S . -B build -G Ninja -DCMAKE_CXX_COMPILER=g++'
             }
         }
 
