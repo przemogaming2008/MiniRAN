@@ -249,16 +249,18 @@ SimulationResult ScenarioRunner::run() {
                         break;
                     }
 
-                    ProtocolMessage message = makeMessage(
-                        MessageType::DownlinkData,
+                    auto downlinkMessage = accessNode.coreNetwork().makeDownlinkData(
                         ueConfig.ueId,
-                        ues[i].sessionId(),
                         static_cast<std::uint32_t>(eventIndex + 1),
                         nowMs,
                         events[eventIndex].payload
                     );
 
-                    if (accessNode.queueDownlinkToUe(message, nowMs)) {
+                    if (!downlinkMessage) {
+                        break;
+                    }
+
+                    if (accessNode.queueDownlinkToUe(*downlinkMessage, nowMs)) {
                         result.ueResults[i].downlinkPacketsSent += 1;
                         result.ueResults[i].downlinkBytesSent += events[eventIndex].payload.size();
                     } else {

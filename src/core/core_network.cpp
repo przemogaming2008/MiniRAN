@@ -266,6 +266,49 @@ void CoreNetwork::handleData(const ProtocolMessage& request, std::uint64_t nowMs
     session.lastSeenMs = nowMs;
 }
 
+std::optional<ProtocolMessage> CoreNetwork::makeDownlinkData(
+    std::uint32_t ueId,
+    std::uint32_t sequenceNumber,
+    std::uint64_t nowMs,
+    const std::vector<std::uint8_t>& payload
+) {
+    if (ueId == 0) {
+        countProtocolRejection(ueId);
+        return std::nullopt;
+    }
+
+    if (payload.empty()) {
+        countProtocolRejection(ueId);
+        return std::nullopt;
+    }
+
+    auto sessionIt = sessions_.find(ueId);
+
+    if (sessionIt == sessions_.end()) {
+        countProtocolRejection(ueId);
+        return std::nullopt;
+    }
+
+    auto& session = sessionIt->second;
+
+    if (session.state != SessionState::Attached) {
+        session.protocolErrors += 1;
+        countProtocolRejection(ueId);
+        return std::nullopt;
+    }
+
+    session.lastSeenMs = nowMs;
+
+    return makeMessage(
+        MessageType::DownlinkData,
+        ueId,
+        session.sessionId,
+        sequenceNumber,
+        nowMs,
+        payload
+    );
+}
+
 void CoreNetwork::expireInactiveSessions(std::uint64_t nowMs) {
 
     //Remove sessions that exceeded inactivity timeout.

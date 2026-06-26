@@ -63,6 +63,12 @@ public:
     const std::unordered_map<std::uint32_t, SessionRecord>& sessions() const;
     const std::unordered_map<std::uint32_t, std::vector<SessionRecord>>& sessionHistory() const;
 
+    std::optional<ProtocolMessage> makeDownlinkData(
+        std::uint32_t ueId,
+        std::uint32_t sequenceNumber,
+        std::uint64_t nowMs,
+        const std::vector<std::uint8_t>& payload
+    );
 private:
     void storeFinishedSession(SessionRecord record, CoreSessionEndReason reason, std::uint64_t nowMs);
     void countProtocolRejection(std::uint32_t ueId);
