@@ -126,6 +126,21 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
 }
 
 bool AccessNode::queueDownlinkToUe(const ProtocolMessage& message, std::uint64_t nowMs) {
+    if (message.header.messageType != MessageType::DownlinkData) {
+        metrics_.packetsDropped += 1;
+        return false;
+    }
+
+    if (message.header.ueId == 0 || message.header.sessionId == 0) {
+        metrics_.packetsDropped += 1;
+        return false;
+    }
+
+    if (!coreNetwork_.hasActiveSession(message.header.ueId, message.header.sessionId)) {
+        metrics_.packetsDropped += 1;
+        return false;
+    }
+
     const auto route = ueNodeByUeId_.find(message.header.ueId);
 
     if (route == ueNodeByUeId_.end()) {
@@ -133,10 +148,13 @@ bool AccessNode::queueDownlinkToUe(const ProtocolMessage& message, std::uint64_t
         return false;
     }
 
-    const bool controlPlane =
-        message.header.messageType != MessageType::DownlinkData;
+    queueDatagramToNode(
+        message,
+        nowMs,
+        route->second,
+        false
+    );
 
-    queueDatagramToNode(message, nowMs, route->second, controlPlane);
     return true;
 }
 

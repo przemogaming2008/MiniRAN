@@ -24,7 +24,21 @@ std::size_t CoreNetwork::activeSessionCount() const {
 
     return count;
 }
+bool CoreNetwork::hasActiveSession(
+        std::uint32_t ueId,
+        std::uint32_t sessionId
+) const {
+    const auto sessionIt = sessions_.find(ueId);
 
+    if (sessionIt == sessions_.end()) {
+        return false;
+    }
+
+    const auto& session = sessionIt->second;
+
+    return session.sessionId == sessionId &&
+        session.state == SessionState::Attached;
+}
 std::optional<ProtocolMessage> CoreNetwork::handleAttachRequest(const ProtocolMessage& request, std::uint64_t nowMs) {
 
     //Optionally reject malformed requests using AttachReject or Error.

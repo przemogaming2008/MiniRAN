@@ -43,6 +43,10 @@ public:
     explicit CoreNetwork(SessionTimers timers = {});
 
     bool hasActiveSession(std::uint32_t ueId) const;
+    bool hasActiveSession(
+        std::uint32_t ueId,
+        std::uint32_t sessionId
+    ) const;
     std::size_t activeSessionCount() const;
 
     std::optional<ProtocolMessage> handleAttachRequest(const ProtocolMessage& request, std::uint64_t nowMs);
@@ -69,6 +73,7 @@ public:
         std::uint64_t nowMs,
         const std::vector<std::uint8_t>& payload
     );
+
 private:
     void storeFinishedSession(SessionRecord record, CoreSessionEndReason reason, std::uint64_t nowMs);
     void countProtocolRejection(std::uint32_t ueId);
