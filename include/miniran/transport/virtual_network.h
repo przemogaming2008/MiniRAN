@@ -10,11 +10,18 @@
 
 namespace miniran {
 
+enum class SubmitResult {
+    Queued,
+    DroppedByLoss,
+    DroppedByQueue,
+    InvalidProfile
+};
+
 class VirtualNetwork {
 public:
     explicit VirtualNetwork(LinkProfile profile, std::uint32_t seed = 1337);
 
-    bool submit(Datagram datagram, std::uint64_t nowMs);
+    SubmitResult submit(Datagram datagram, std::uint64_t nowMs);
     std::vector<Datagram> pollReady(std::uint64_t nowMs);
 
     std::size_t queuedPackets() const;

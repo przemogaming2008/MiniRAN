@@ -19,7 +19,7 @@ TEST_CASE(tcp_virtual_network_delivers_all_packets_even_if_loss_is_configured) {
         datagram.fromNodeId = 1;
         datagram.toNodeId = 100;
         datagram.bytes = std::vector<std::uint8_t>(20, static_cast<std::uint8_t>(index));
-        ASSERT_TRUE(network.submit(datagram, 0));
+        ASSERT_EQ(network.submit(datagram, 0), SubmitResult::Queued);
     }
 
     const auto ready = network.pollReady(100);
@@ -45,7 +45,7 @@ TEST_CASE(queue_limit_causes_drop_when_full) {
     Datagram second = first;
     second.bytes = std::vector<std::uint8_t>(10, 2);
 
-    ASSERT_TRUE(network.submit(first, 0));
-    ASSERT_TRUE(!network.submit(second, 0));
+    ASSERT_EQ(network.submit(first, 0), SubmitResult::Queued);
+    ASSERT_EQ(network.submit(second, 0), SubmitResult::DroppedByQueue);
     ASSERT_EQ(network.metrics().packetsDropped, 1U);
 }

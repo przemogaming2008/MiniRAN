@@ -8,9 +8,9 @@ namespace miniran {
 
 VirtualNetwork::VirtualNetwork(LinkProfile profile, std::uint32_t seed) : profile_(profile), rng_(seed) {}
 
-bool VirtualNetwork::submit(Datagram datagram, std::uint64_t nowMs) {
+SubmitResult VirtualNetwork::submit(Datagram datagram, std::uint64_t nowMs) {
     if (!profile_.isValid()) {
-        return false;
+        return SubmitResult::InvalidProfile;
     }
 
     metrics_.packetsSent += 1;
@@ -22,13 +22,13 @@ bool VirtualNetwork::submit(Datagram datagram, std::uint64_t nowMs) {
     if (profile_.mode == TransportMode::Udp && probability_(rng_) < profile_.lossPercent) {
         metrics_.packetsDropped += 1;
         metrics_.packetsDroppedByLoss += 1;
-        return true;
+        return SubmitResult::DroppedByLoss;
     }
-    
+
     if (queue_.size() >= profile_.queueLimitPackets) {
         metrics_.packetsDropped += 1;
         metrics_.packetsDroppedByQueue += 1;
-        return false;
+        return SubmitResult::DroppedByQueue;
     }
 
     const auto jitterRange = static_cast<int>(profile_.jitterMs);
@@ -61,7 +61,7 @@ bool VirtualNetwork::submit(Datagram datagram, std::uint64_t nowMs) {
     }
 
     queue_.push_back(std::move(datagram));
-    return true;
+    return SubmitResult::Queued;
 }
 
 std::vector<Datagram> VirtualNetwork::pollReady(std::uint64_t nowMs) {
