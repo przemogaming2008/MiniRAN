@@ -255,7 +255,6 @@ void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
 
     if (protocolMessage.header.messageType == MessageType::HeartbeatAck) {
         if (!sessionManager_.isAttached()) {
-            protocolMetrics_.protocolErrorsReceived += 1;
             return;
         }
 

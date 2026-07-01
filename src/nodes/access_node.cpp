@@ -50,16 +50,16 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
     //    - Data           -> coreNetwork_.handleData()
     //    - DetachRequest  -> coreNetwork_.handleDetachRequest()
     if (protocolMessage.header.messageType == MessageType::AttachRequest) {
-        ++metrics_.packetsDelivered;
-        metrics_.bytesDelivered += datagram.bytes.size();
-
         auto response = coreNetwork_.handleAttachRequest(protocolMessage, nowMs);
 
-        if (response) {
-            if (response->header.messageType == MessageType::AttachAccept) {
-                rememberUeRoute(protocolMessage.header.ueId, datagram.fromNodeId);
-            }
+        if (response && response->header.messageType == MessageType::AttachAccept) {
+            ++metrics_.packetsDelivered;
+            metrics_.bytesDelivered += datagram.bytes.size();
 
+            rememberUeRoute(protocolMessage.header.ueId, datagram.fromNodeId);
+        }
+
+        if (response) {
             queueResponseToUe(*response, nowMs, datagram.fromNodeId);
         }
 
@@ -67,14 +67,14 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
     }
 
     if (protocolMessage.header.messageType == MessageType::Heartbeat) {
-        ++metrics_.packetsDelivered;
-        metrics_.bytesDelivered += datagram.bytes.size();
+        auto response = coreNetwork_.handleHeartbeat(protocolMessage, nowMs);
 
-        if (coreNetwork_.hasActiveSession(protocolMessage.header.ueId)) {
+        if (response && response->header.messageType == MessageType::HeartbeatAck) {
+            ++metrics_.packetsDelivered;
+            metrics_.bytesDelivered += datagram.bytes.size();
+
             rememberUeRoute(protocolMessage.header.ueId, datagram.fromNodeId);
         }
-
-        auto response = coreNetwork_.handleHeartbeat(protocolMessage, nowMs);
 
         if (response) {
             queueResponseToUe(*response, nowMs, datagram.fromNodeId);
@@ -84,26 +84,36 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
     }
 
     if (protocolMessage.header.messageType == MessageType::Data) {
-        ++metrics_.packetsDelivered;
-        metrics_.bytesDelivered += datagram.bytes.size();
+        const std::size_t packetsBefore =
+            coreNetwork_.deliveredPacketsForUe(protocolMessage.header.ueId);
 
-        if (coreNetwork_.hasActiveSession(protocolMessage.header.ueId)) {
+        if (coreNetwork_.hasActiveSession(
+                protocolMessage.header.ueId,
+                protocolMessage.header.sessionId
+            )) {
             rememberUeRoute(protocolMessage.header.ueId, datagram.fromNodeId);
         }
 
         coreNetwork_.handleData(protocolMessage, nowMs);
+
+        const std::size_t packetsAfter =
+            coreNetwork_.deliveredPacketsForUe(protocolMessage.header.ueId);
+
+        if (packetsAfter > packetsBefore) {
+            ++metrics_.packetsDelivered;
+            metrics_.bytesDelivered += datagram.bytes.size();
+        }
+
         return;
     }
 
     if (protocolMessage.header.messageType == MessageType::DetachRequest) {
-        ++metrics_.packetsDelivered;
-        metrics_.bytesDelivered += datagram.bytes.size();
-
-        if (coreNetwork_.hasActiveSession(protocolMessage.header.ueId)) {
-            rememberUeRoute(protocolMessage.header.ueId, datagram.fromNodeId);
-        }
-
         auto response = coreNetwork_.handleDetachRequest(protocolMessage, nowMs);
+
+        if (response && response->header.messageType == MessageType::DetachAccept) {
+            ++metrics_.packetsDelivered;
+            metrics_.bytesDelivered += datagram.bytes.size();
+        }
 
         if (response) {
             queueResponseToUe(*response, nowMs, datagram.fromNodeId);
