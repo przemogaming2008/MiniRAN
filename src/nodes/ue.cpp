@@ -236,12 +236,20 @@ void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
     }
 
     if (protocolMessage.header.messageType == MessageType::DetachAccept) {
+        if (sessionManager_.state() != SessionState::Detaching) {
+            protocolMetrics_.protocolErrorsReceived += 1;
+            return;
+        }
+
         if (protocolMessage.header.sessionId != sessionManager_.sessionId()) {
             protocolMetrics_.invalidMessagesDropped += 1;
             return;
         }
 
-        sessionManager_.onDetachAccepted(nowMs);
+        if (!sessionManager_.onDetachAccepted(nowMs)) {
+            protocolMetrics_.protocolErrorsReceived += 1;
+        }
+
         return;
     }
 
