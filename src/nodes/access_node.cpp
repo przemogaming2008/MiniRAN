@@ -94,7 +94,7 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
             rememberUeRoute(protocolMessage.header.ueId, datagram.fromNodeId);
         }
 
-        coreNetwork_.handleData(protocolMessage, nowMs);
+        auto response = coreNetwork_.handleData(protocolMessage, nowMs);
 
         const std::size_t packetsAfter =
             coreNetwork_.deliveredPacketsForUe(protocolMessage.header.ueId);
@@ -102,6 +102,10 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
         if (packetsAfter > packetsBefore) {
             ++metrics_.packetsDelivered;
             metrics_.bytesDelivered += datagram.bytes.size();
+        }
+
+        if (response) {
+            queueResponseToUe(*response, nowMs, datagram.fromNodeId);
         }
 
         return;

@@ -52,7 +52,10 @@ public:
     std::optional<ProtocolMessage> handleAttachRequest(const ProtocolMessage& request, std::uint64_t nowMs);
     std::optional<ProtocolMessage> handleDetachRequest(const ProtocolMessage& request, std::uint64_t nowMs);
     std::optional<ProtocolMessage> handleHeartbeat(const ProtocolMessage& request, std::uint64_t nowMs);
-    void handleData(const ProtocolMessage& request, std::uint64_t nowMs);
+    std::optional<ProtocolMessage> handleData(
+        const ProtocolMessage& request,
+        std::uint64_t nowMs
+    );
     void expireInactiveSessions(std::uint64_t nowMs);
 
     std::size_t deliveredBytes() const;

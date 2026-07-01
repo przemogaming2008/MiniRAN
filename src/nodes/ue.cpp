@@ -269,12 +269,11 @@ void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
     }
 
     if (protocolMessage.header.messageType == MessageType::DataAck) {
-        if (protocolMessage.header.sessionId != sessionManager_.sessionId()) {
-            protocolMetrics_.invalidMessagesDropped += 1;
+        if (!sessionManager_.isAttached()) {
             return;
         }
 
-        if (!sessionManager_.isAttached()) {
+        if (protocolMessage.header.sessionId != sessionManager_.sessionId()) {
             protocolMetrics_.invalidMessagesDropped += 1;
             return;
         }

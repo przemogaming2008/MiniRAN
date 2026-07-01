@@ -230,54 +230,72 @@ std::optional<ProtocolMessage> CoreNetwork::handleHeartbeat(const ProtocolMessag
     return msg;
 }
 
-void CoreNetwork::handleData(const ProtocolMessage& request, std::uint64_t nowMs) {
+std::optional<ProtocolMessage> CoreNetwork::handleData(
+    const ProtocolMessage& request,
+    std::uint64_t nowMs
+) {
+    const auto ueId = request.header.ueId;
 
-    if (request.header.messageType != MessageType::Data) {
-        return;
+    auto sessionIt = sessions_.find(ueId);
+
+    if (sessionIt == sessions_.end()) {
+        countProtocolRejection(ueId);
+
+        return makeMessage(
+            MessageType::Error,
+            request.header.ueId,
+            request.header.sessionId,
+            request.header.sequenceNumber,
+            nowMs
+        );
     }
 
-    auto it = sessions_.find(request.header.ueId);
-    if (it == sessions_.end()) {
-        countProtocolRejection(request.header.ueId);
-        return;
+    auto& session = sessionIt->second;
+
+    if (session.state != SessionState::Attached ||
+        session.sessionId != request.header.sessionId) {
+        session.protocolErrors += 1;
+        countProtocolRejection(ueId);
+
+        return makeMessage(
+            MessageType::Error,
+            request.header.ueId,
+            request.header.sessionId,
+            request.header.sequenceNumber,
+            nowMs
+        );
     }
 
-    SessionRecord& session = it->second;
+    if (request.header.payloadLength == 0 ||
+        request.payload.empty() ||
+        request.header.payloadLength != request.payload.size()) {
 
-    //Accept data only for active sessions.
-    if (session.state != SessionState::Attached) {
-        ++session.protocolErrors;
-        countProtocolRejection(request.header.ueId);
-        return;
+        session.protocolErrors += 1;
+        countProtocolRejection(ueId);
+
+        return makeMessage(
+            MessageType::Error,
+            request.header.ueId,
+            request.header.sessionId,
+            request.header.sequenceNumber,
+            nowMs
+        );
     }
 
-    if (request.header.sessionId != session.sessionId) {
-        ++session.protocolErrors;
-        countProtocolRejection(request.header.ueId);
-        return;
-    }
-
-    if (request.payload.size() != request.header.payloadLength) {
-        ++session.protocolErrors;
-        countProtocolRejection(request.header.ueId);
-        return;
-    }
-
-    if (request.payload.empty()) {
-        ++session.protocolErrors;
-        countProtocolRejection(request.header.ueId);
-        return;
-    }
-
-    //Count delivered bytes and packets.
-    session.deliveredBytes += request.payload.size();
-    session.deliveredPackets += 1;
-
-    deliveredBytes_ += request.payload.size();
-    deliveredPackets_ += 1;
-
-    //Refresh lastSeenMs for the session.
     session.lastSeenMs = nowMs;
+    session.deliveredPackets += 1;
+    session.deliveredBytes += request.payload.size();
+
+    deliveredPackets_ += 1;
+    deliveredBytes_ += request.payload.size();
+    
+    return makeMessage(
+        MessageType::DataAck,
+        request.header.ueId,
+        session.sessionId,
+        request.header.sequenceNumber,
+        nowMs
+    );
 }
 
 std::optional<ProtocolMessage> CoreNetwork::makeDownlinkData(

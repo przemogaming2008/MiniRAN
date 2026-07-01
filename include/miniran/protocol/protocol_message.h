@@ -19,8 +19,8 @@ enum class MessageType : std::uint8_t {
 
     DataAck = 10,
     DownlinkData = 11,
-    StatsRequest = 12,
-    StatsResponse = 13,
+    StatsRequest = 12, // Reserved for future use.
+    StatsResponse = 13, // Reserved for future use.
 };
 
 enum class SessionState : std::uint8_t {
