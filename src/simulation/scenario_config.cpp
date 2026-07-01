@@ -27,7 +27,20 @@ std::optional<std::string> readValue(const std::unordered_map<std::string, std::
     }
     return it->second;
 }
+std::optional<std::string> requireKey(
+    const std::unordered_map<std::string, std::string>& values,
+    const std::string& key,
+    std::string& error
+) {
+    const auto it = values.find(key);
 
+    if (it == values.end()) {
+        error = "Missing required key: " + key;
+        return std::nullopt;
+    }
+
+    return it->second;
+}
 }  // namespace
 bool ScenarioConfig::validate(std::string& error) const {
     if (stepMs == 0) {
@@ -359,12 +372,17 @@ std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, 
         const std::string prefix = "ue." + std::to_string(i) + ".";
 
         UeConfig ueConfig;
-        ueConfig.nodeId = 7 + i;
-        ueConfig.ueId = 7 + i;
+
+        if (!requireKey(values, prefix + "node_id", error)) {
+            return std::nullopt;
+        }
+
+        if (!requireKey(values, prefix + "ue_id", error)) {
+            return std::nullopt;
+        }
 
         if (!parseUnsigned32(prefix + "node_id", ueConfig.nodeId)) return std::nullopt;
         if (!parseUnsigned32(prefix + "ue_id", ueConfig.ueId)) return std::nullopt;
-
         if (!parseUnsigned(prefix + "attach_start_ms", ueConfig.attachStartMs)) return std::nullopt;
         if (!parseUnsigned(prefix + "traffic_start_ms", ueConfig.trafficStartMs)) return std::nullopt;
         if (!parseUnsigned(prefix + "traffic_end_ms", ueConfig.trafficEndMs)) return std::nullopt;
