@@ -214,20 +214,22 @@ SimulationResult ScenarioRunner::run() {
                 auto& eventIndex = uplinkEventIndexes[i];
 
                 while (eventIndex < events.size() &&
-                       ueConfig.trafficStartMs + events[eventIndex].timestampMs <= nowMs) {
+                    ueConfig.trafficStartMs + events[eventIndex].timestampMs <= nowMs) {
+
+                    const auto& event = events[eventIndex];
 
                     if (!ues[i].isAttached()) {
-                        break;
+                        result.ueResults[i].uplinkPacketsGenerated += 1;
+                        result.ueResults[i].uplinkBytesGenerated += event.payload.size();
+
+                        result.ueResults[i].uplinkPacketsSkippedNoSession += 1;
+                        result.ueResults[i].uplinkBytesSkippedNoSession += event.payload.size();
+
+                        ++eventIndex;
+                        continue;
                     }
 
-                    const auto packetsBefore = ues[i].uplinkMetrics().packetsSent;
-
-                    ues[i].sendTraffic(events[eventIndex].payload, nowMs);
-
-                    if (ues[i].uplinkMetrics().packetsSent > packetsBefore) {
-                        result.ueResults[i].trafficStarted = true;
-                    }
-
+                    ues[i].sendTraffic(event.payload, nowMs);
                     ++eventIndex;
                 }
             }
