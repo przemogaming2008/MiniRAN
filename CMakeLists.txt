@@ -59,7 +59,7 @@ if(MINIRAN_BUILD_TESTS)
         tests/component/test_udp_stability.cpp
         tests/component/test_udp_higher_loss.cpp
         tests/component/test_udp_low_bandwidth_limits_throughput.cpp
-        # tests/component/test_ci_mega_gate.cpp
+        tests/component/test_ci_mega_gate.cpp
     )
 
     function(add_miniran_test_binary target_name)
@@ -73,12 +73,21 @@ if(MINIRAN_BUILD_TESTS)
     add_miniran_test_binary(miniran_tests ${MINIRAN_UNIT_TEST_SOURCES} ${MINIRAN_COMPONENT_TEST_SOURCES})
 
     add_test(NAME unit_tests COMMAND miniran_unit_tests)
-    set_tests_properties(unit_tests PROPERTIES LABELS "unit")
+    set_tests_properties(unit_tests PROPERTIES
+        LABELS "unit"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
 
     add_test(NAME component_tests COMMAND miniran_component_tests)
-    set_tests_properties(component_tests PROPERTIES LABELS "component")
+    set_tests_properties(component_tests PROPERTIES
+        LABELS "component"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
 
     add_test(NAME all_tests COMMAND miniran_tests)
-    set_tests_properties(all_tests PROPERTIES LABELS "all")
+    set_tests_properties(all_tests PROPERTIES
+        LABELS "all"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
 
 endif()
