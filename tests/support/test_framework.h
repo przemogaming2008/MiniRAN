@@ -1,6 +1,8 @@
 #pragma once
 
+#include <chrono>
 #include <cmath>
+#include <fstream>
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -21,6 +23,13 @@ public:
 struct TestCase {
     std::string name;
     std::function<void()> function;
+};
+
+struct TestResult {
+    std::string name;
+    bool passed = false;
+    std::string message;
+    double timeSeconds = 0.0;
 };
 
 inline std::vector<TestCase>& registry() {
@@ -51,6 +60,77 @@ inline std::string toDebugString(const char* value) {
     return value ? std::string(value) : std::string("<null>");
 }
 
+inline std::string escapeXml(const std::string& value) {
+    std::string escaped;
+
+    for (const char ch : value) {
+        switch (ch) {
+            case '&':
+                escaped += "&amp;";
+                break;
+            case '<':
+                escaped += "&lt;";
+                break;
+            case '>':
+                escaped += "&gt;";
+                break;
+            case '"':
+                escaped += "&quot;";
+                break;
+            case '\'':
+                escaped += "&apos;";
+                break;
+            default:
+                escaped += ch;
+                break;
+        }
+    }
+
+    return escaped;
+}
+
+inline void writeJUnit(const std::vector<TestResult>& results, const std::string& path) {
+    if (path.empty()) {
+        return;
+    }
+
+    int failures = 0;
+    double totalTime = 0.0;
+
+    for (const auto& result : results) {
+        if (!result.passed) {
+            ++failures;
+        }
+        totalTime += result.timeSeconds;
+    }
+
+    std::ofstream output(path);
+
+    if (!output) {
+        throw std::runtime_error("Could not write JUnit report: " + path);
+    }
+
+    output << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    output << "<testsuite name=\"MiniRAN\" tests=\"" << results.size() << "\" failures=\"" << failures
+           << "\" errors=\"0\" time=\"" << std::fixed << std::setprecision(6) << totalTime << "\">\n";
+
+    for (const auto& result : results) {
+        output << "  <testcase name=\"" << escapeXml(result.name) << "\" time=\"" << std::fixed << std::setprecision(6)
+               << result.timeSeconds << "\">";
+
+        if (!result.passed) {
+            output << "\n";
+            output << "    <failure message=\"" << escapeXml(result.message) << "\">" << escapeXml(result.message)
+                   << "</failure>\n";
+            output << "  </testcase>\n";
+        } else {
+            output << "</testcase>\n";
+        }
+    }
+
+    output << "</testsuite>\n";
+}
+
 inline void assertTrue(bool condition, const char* expression, const char* file, int line) {
     if (!condition) {
         std::ostringstream output;
@@ -60,7 +140,8 @@ inline void assertTrue(bool condition, const char* expression, const char* file,
 }
 
 template <typename Left, typename Right>
-void assertEqual(const Left& left, const Right& right, const char* leftExpr, const char* rightExpr, const char* file, int line) {
+void assertEqual(const Left& left, const Right& right, const char* leftExpr, const char* rightExpr, const char* file,
+                 int line) {
     if (!(left == right)) {
         std::ostringstream output;
         output << file << ':' << line << " ASSERT_EQ failed: " << leftExpr << " != " << rightExpr << " ("
@@ -89,20 +170,36 @@ inline void assertNear(double left, double right, double tolerance, const char* 
     }
 }
 
-inline int runAllTests() {
+inline int runAllTests(const std::string& junitPath = {}) {
     int passed = 0;
     int failed = 0;
+    std::vector<TestResult> results;
 
     for (const auto& test : registry()) {
+        TestResult result;
+        result.name = test.name;
+
+        const auto start = std::chrono::steady_clock::now();
+
         try {
             test.function();
+            result.passed = true;
             std::cout << "[PASS] " << test.name << '\n';
             ++passed;
         } catch (const std::exception& ex) {
+            result.passed = false;
+            result.message = ex.what();
             std::cout << "[FAIL] " << test.name << "\n       " << ex.what() << '\n';
             ++failed;
         }
+
+        const auto end = std::chrono::steady_clock::now();
+        result.timeSeconds = std::chrono::duration<double>(end - start).count();
+
+        results.push_back(std::move(result));
     }
+
+    writeJUnit(results, junitPath);
 
     std::cout << "\nSummary: passed=" << passed << ", failed=" << failed << '\n';
     return failed == 0 ? 0 : 1;
@@ -116,9 +213,9 @@ struct TestRegistrar {
 
 }  // namespace miniran::test
 
-#define TEST_CASE(name)                                                           \
-    static void name();                                                           \
-    static ::miniran::test::TestRegistrar name##_registrar(#name, &name);        \
+#define TEST_CASE(name)                                                    \
+    static void name();                                                    \
+    static ::miniran::test::TestRegistrar name##_registrar(#name, &name); \
     static void name()
 
 #define ASSERT_TRUE(expression) ::miniran::test::assertTrue((expression), #expression, __FILE__, __LINE__)
