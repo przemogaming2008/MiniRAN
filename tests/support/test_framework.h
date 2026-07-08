@@ -139,6 +139,14 @@ inline void assertTrue(bool condition, const char* expression, const char* file,
     }
 }
 
+inline void assertTrueMessage(bool condition, const std::string& message, const char* file, int line) {
+    if (!condition) {
+        std::ostringstream output;
+        output << file << ':' << line << " ASSERT_TRUE failed: " << message;
+        throw TestFailure(output.str());
+    }
+}
+
 template <typename Left, typename Right>
 void assertEqual(const Left& left, const Right& right, const char* leftExpr, const char* rightExpr, const char* file,
                  int line) {
@@ -223,3 +231,5 @@ struct TestRegistrar {
 #define ASSERT_NE(left, right) ::miniran::test::assertNotEqual((left), (right), #left, #right, __FILE__, __LINE__)
 #define ASSERT_NEAR(left, right, tolerance) \
     ::miniran::test::assertNear((left), (right), (tolerance), #left, #right, #tolerance, __FILE__, __LINE__)
+
+#define ASSERT_TRUE(expression) ::miniran::test::assertTrue((expression), #expression, __FILE__, __LINE__)
