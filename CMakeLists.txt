@@ -86,7 +86,7 @@ if(MINIRAN_BUILD_TESTS)
 
     add_test(NAME all_tests COMMAND miniran_tests)
     set_tests_properties(all_tests PROPERTIES
-        LABELS "all"
+        LABELS "all;mega"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     )
 

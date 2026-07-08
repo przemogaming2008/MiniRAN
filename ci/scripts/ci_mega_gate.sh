@@ -7,6 +7,7 @@ set -Eeuo pipefail
 mkdir -p "$CI_LOG_DIR" "$CI_REPORT_DIR"
 
 ctest --test-dir "$BUILD_DIR" \
+  -C "${CTEST_CONFIG:-Debug}" \
   -L mega \
   --output-on-failure \
   --output-log "$CI_LOG_DIR/mega-gate.log" \

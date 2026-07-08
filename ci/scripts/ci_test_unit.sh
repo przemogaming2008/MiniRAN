@@ -8,6 +8,7 @@ mkdir -p "$CI_LOG_DIR" "$CI_REPORT_DIR"
 
 # Wersja szybka: raport z CTest. Wersja lepsza: binarka testowa sama zapisuje JUnit per test case.
 ctest --test-dir "$BUILD_DIR" \
+  -C "${CTEST_CONFIG:-Debug}" \
   -L unit \
   --output-on-failure \
   --output-log "$CI_LOG_DIR/unit-ctest.log" \
