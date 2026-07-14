@@ -1,4 +1,3 @@
-
 # MiniRAN CI Runbook
 
 ## Lokalny baseline
