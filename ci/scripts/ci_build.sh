@@ -15,6 +15,10 @@ cmake -S . -B "$BUILD_DIR" \
   2>&1 | tee -a "$CI_LOG_DIR/build.log"
 
 echo "[CI] Build MiniRAN" | tee -a "$CI_LOG_DIR/build.log"
-cmake --build "$BUILD_DIR" -j "$(nproc 2>/dev/null || echo 2)" \
+: "${CI_BUILD_JOBS:=2}"
+
+echo "[CI] Build jobs: $CI_BUILD_JOBS" | tee -a "$CI_LOG_DIR/build.log"
+
+cmake --build "$BUILD_DIR" --parallel "$CI_BUILD_JOBS" \
   2>&1 | tee -a "$CI_LOG_DIR/build.log"
 
