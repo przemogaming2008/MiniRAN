@@ -17,6 +17,16 @@ pipeline {
     }
 
     stages {
+
+        stage('00 Clean workspace outputs') {
+            steps {
+                sh '''
+                    rm -rf build/ci ci_out
+                    mkdir -p ci_out/logs ci_out/reports ci_out/artifacts
+                '''
+            }
+        }
+
         stage('01 Preflight - środowisko') {
             steps {
                 sh 'bash ci/scripts/ci_env_report.sh'
@@ -57,7 +67,7 @@ pipeline {
     post {
         always {
             sh 'bash ci/scripts/ci_collect_logs.sh || true'
-            junit testResults: 'ci_out/reports/**/*.xml', allowEmptyResults: true
+            junit testResults: 'ci_out/reports/**/*.xml', allowEmptyResults: false
             archiveArtifacts artifacts: 'ci_out/**/*', fingerprint: true, allowEmptyArchive: true
         }
         success {
