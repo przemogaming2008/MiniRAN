@@ -1,12 +1,14 @@
+#include <cstdio>
 #include <fstream>
 #include <string>
+
 #include "miniran/simulation/scenario_config.h"
 #include "support/test_framework.h"
 
 using namespace miniran;
 
-TEST_CASE(config_invalid_numeric_value_returns_error){
-    const std::string path = "invalid_numeric.cfg";
+TEST_CASE(config_invalid_numeric_value_returns_error) {
+    const std::string path = "tmp_invalid_numeric_config.cfg";
 
     {
         std::ofstream file(path);
@@ -15,6 +17,8 @@ TEST_CASE(config_invalid_numeric_value_returns_error){
 
     std::string error;
     auto config = ScenarioConfig::fromFile(path, error);
+
+    std::remove(path.c_str());
 
     ASSERT_TRUE(!config.has_value());
     ASSERT_TRUE(error.find("step_ms") != std::string::npos);
