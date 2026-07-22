@@ -140,8 +140,9 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
     }
     //- If Attached and heartbeat interval elapsed, you may also request a Heartbeat.
     if (state_ == SessionState::Attached &&
-        (nowMs - lastHeartbeatAckMs_) >= timers_.heartbeatIntervalMs)
+    (nowMs - lastHeartbeatTxMs_) >= timers_.heartbeatIntervalMs)
     {
+        lastHeartbeatTxMs_ = nowMs;
         return {true, MessageType::Heartbeat};
     }
 

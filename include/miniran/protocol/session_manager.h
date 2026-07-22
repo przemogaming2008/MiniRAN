@@ -48,8 +48,10 @@ private:
     std::uint32_t nextSequenceNumber_ = 1;
     std::uint64_t lastControlTxMs_ = 0;
     std::uint64_t lastHeartbeatAckMs_ = 0;
+    std::uint64_t lastHeartbeatTxMs_ = 0;
     std::uint32_t attachRetryCount_ = 0;
     std::uint32_t detachRetryCount_ = 0;
+    
 };
 
 }  // namespace miniran
