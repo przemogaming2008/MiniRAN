@@ -178,41 +178,54 @@ void Ue::tick(std::uint64_t nowMs) {
 
 void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
 
-    //Decode incoming bytes.
+    // Decode incoming bytes.
     std::string error;
-    std::optional<ProtocolMessage> protocolMessage_opt= FrameCodec::decode(datagram.bytes, error);
-    //Handle AttachAccept / DetachAccept / HeartbeatAck / Error.
-    if(protocolMessage_opt){
-        ProtocolMessage protocolMessage = *protocolMessage_opt;
+    std::optional<ProtocolMessage> protocolMessage_opt = FrameCodec::decode(datagram.bytes, error);
 
-        if (protocolMessage.header.ueId != nodeId()) {
+    if (!protocolMessage_opt) {
+        return;
+    }
+
+    ProtocolMessage protocolMessage = *protocolMessage_opt;
+
+    if (protocolMessage.header.ueId != nodeId()) {
+        return;
+    }
+
+    if (protocolMessage.header.messageType == MessageType::AttachAccept) {
+        if (protocolMessage.header.sessionId == 0) {
             return;
         }
 
-        if (protocolMessage.header.messageType == MessageType::AttachAccept) {
-            if (protocolMessage.header.sessionId == 0) {
-                return;
-            }
+        sessionManager_.onAttachAccepted(protocolMessage.header.sessionId, nowMs);
 
-            sessionManager_.onAttachAccepted(protocolMessage.header.sessionId, nowMs);
-        } else if (protocolMessage.header.messageType == MessageType::DetachAccept) {
-            if (protocolMessage.header.sessionId != sessionManager_.sessionId()) {
-                return;
-            }
-            sessionManager_.onDetachAccepted(nowMs);
-        } else if (protocolMessage.header.messageType == MessageType::HeartbeatAck){
-            if (protocolMessage.header.sessionId != sessionManager_.sessionId()) {
-                return;
-            }
-            sessionManager_.onHeartbeatResponse(nowMs);
-        } else if (protocolMessage.header.messageType == MessageType::Error){
-            //error message type, to do?
-        } else {
-            //inapropriate messagetype
+    } else if (protocolMessage.header.messageType == MessageType::DetachAccept) {
+        if (protocolMessage.header.sessionId != sessionManager_.sessionId()) {
+            return;
+        }
+
+        sessionManager_.onDetachAccepted(nowMs);
+
+    } else if (protocolMessage.header.messageType == MessageType::HeartbeatAck) {
+        if (protocolMessage.header.sessionId != sessionManager_.sessionId()) {
+            return;
+        }
+
+        sessionManager_.onHeartbeatResponse(nowMs);
+
+    } else if (protocolMessage.header.messageType == MessageType::AttachReject) {
+        if (sessionManager_.state() == SessionState::Attaching) {
+            sessionManager_.reset();
+        }
+
+    } else if (protocolMessage.header.messageType == MessageType::Error) {
+        if (sessionManager_.state() == SessionState::Attaching) {
+            sessionManager_.reset();
         }
 
     } else {
-        //opt, error
+        // Inappropriate message type for UE.
+        return;
     }
 }
 
