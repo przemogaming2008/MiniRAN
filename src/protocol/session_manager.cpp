@@ -29,44 +29,40 @@ std::uint32_t SessionManager::nextSequenceNumber() {
 
 bool SessionManager::beginAttach(std::uint64_t nowMs) {
 
-    //Allow transition Idle/Released -> Attaching.
+    // Allow transition Idle/Released/Rejected -> Attaching.
+    if (state_ == SessionState::Idle || state_ == SessionState::Released || state_ == SessionState::Rejected) {
 
-    //Allow re-attach after a previously rejected/failed attach attempt.
-    if( state_ == SessionState::Idle || state_ == SessionState::Released || state_ == SessionState::Rejected){
+        // New attach must start with a clean local session context.
+        sessionId_ = 0;
+        attachRetryCount_ = 0;
+        detachRetryCount_ = 0;
+        lastHeartbeatTxMs_ = 0;
+        lastHeartbeatAckMs_ = 0;
 
         state_ = SessionState::Attaching;
-
-        //Reset attach retry counter.
-        attachRetryCount_= 0;
-        //Remember the time of the control transmission.
         lastControlTxMs_ = nowMs;
-        //Return true only when a new AttachRequest should be sent.
+
         return true;
     }
-    
+
     return false;
 }
 
 bool SessionManager::onAttachAccepted(std::uint32_t sessionId, std::uint64_t nowMs) {
 
-    // Accept the session only if the current state is Attaching.
     if (state() != SessionState::Attaching) {
         return false;
     }
 
-    // Reject invalid session ids.
     if (sessionId == 0) {
         return false;
     }
 
-    // Store the assigned session id.
     sessionId_ = sessionId;
-
-    // Move to Attached.
     state_ = SessionState::Attached;
 
-    // Refresh activity timestamps.
     lastControlTxMs_ = nowMs;
+    lastHeartbeatTxMs_ = nowMs;
     lastHeartbeatAckMs_ = nowMs;
 
     return true;
@@ -89,16 +85,19 @@ bool SessionManager::beginDetach(std::uint64_t nowMs) {
 
 bool SessionManager::onDetachAccepted(std::uint64_t nowMs) {
 
-    //Accept only if state is Detaching.
-    if(state() != SessionState::Detaching){
+    if (state() != SessionState::Detaching) {
         return false;
     }
-    //Move to Released.
+
     state_ = SessionState::Released;
-    //Optionally clear session id or keep it for post-analysis.
     sessionId_ = 0;
+
     lastControlTxMs_ = nowMs;
-    lastHeartbeatAckMs_ = nowMs;
+    lastHeartbeatTxMs_ = 0;
+    lastHeartbeatAckMs_ = 0;
+
+    detachRetryCount_ = 0;
+
     return true;
 }
 
@@ -134,7 +133,11 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
         } else {
             //detach retries exhausted.
             state_ = SessionState::Released;
+            sessionId_ = 0;
             detachRetryCount_ = 0;
+            lastControlTxMs_ = nowMs;
+            lastHeartbeatTxMs_ = 0;
+            lastHeartbeatAckMs_ = 0;
             return {};
         }
     }
@@ -155,6 +158,7 @@ void SessionManager::reset() {
     sessionId_ = 0;
     nextSequenceNumber_ = 1;
     lastControlTxMs_ = 0;
+    lastHeartbeatTxMs_ = 0;
     lastHeartbeatAckMs_ = 0;
     attachRetryCount_ = 0;
     detachRetryCount_ = 0;
