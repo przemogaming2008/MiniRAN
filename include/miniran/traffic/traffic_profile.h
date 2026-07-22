@@ -62,7 +62,9 @@ struct TrafficProfile {
                 return burstPackets > 0 && burstIntervalMs > 0;
 
             case TrafficPattern::Ramp:
-                return rampStartPps > 0 && rampEndPps > 0;
+                return rampStartPps > 0 &&
+                    rampEndPps > 0 &&
+                    rampEndPps >= rampStartPps;
         }
 
         return false;

@@ -4,6 +4,16 @@
 
 namespace miniran {
 
+namespace {
+
+constexpr std::size_t kMaxGeneratedEvents = 1'000'000;
+
+bool reachedEventLimit(const std::vector<TrafficEvent>& events) {
+    return events.size() >= kMaxGeneratedEvents;
+}
+
+}  // namespace
+
 TrafficGenerator::TrafficGenerator(TrafficProfile profile, std::uint32_t seed) : profile_(profile), rng_(seed) {}
 
 std::vector<std::uint8_t> TrafficGenerator::makePayload(std::size_t size, std::uint8_t seed) {
@@ -24,7 +34,7 @@ std::vector<TrafficEvent> TrafficGenerator::generate() {
         case TrafficPattern::ConstantBitrate: {
             const double intervalMs = 1000.0 / static_cast<double>(profile_.packetsPerSecond);
             double currentMs = 0.0;
-            while (currentMs < static_cast<double>(profile_.durationMs)) {
+            while (currentMs < static_cast<double>(profile_.durationMs) && !reachedEventLimit(events)) {
                 TrafficEvent event;
                 event.timestampMs = static_cast<std::uint64_t>(currentMs);
                 event.payload = makePayload(profile_.packetSizeBytes, static_cast<std::uint8_t>(events.size() & 0xFFU));
@@ -33,10 +43,13 @@ std::vector<TrafficEvent> TrafficGenerator::generate() {
             }
             break;
         }
+
         case TrafficPattern::Bursty: {
             std::uint64_t burstStartMs = 0;
-            while (burstStartMs < profile_.durationMs) {
-                for (std::uint32_t packetIndex = 0; packetIndex < profile_.burstPackets; ++packetIndex) {
+            while (burstStartMs < profile_.durationMs && !reachedEventLimit(events)) {
+                for (std::uint32_t packetIndex = 0;
+                     packetIndex < profile_.burstPackets && !reachedEventLimit(events);
+                     ++packetIndex) {
                     TrafficEvent event;
                     event.timestampMs = std::min<std::uint64_t>(profile_.durationMs - 1, burstStartMs + packetIndex);
                     event.payload = makePayload(profile_.packetSizeBytes, static_cast<std::uint8_t>((events.size() * 3U) & 0xFFU));
@@ -46,13 +59,17 @@ std::vector<TrafficEvent> TrafficGenerator::generate() {
             }
             break;
         }
+
         case TrafficPattern::Ramp: {
+            const double startPps = static_cast<double>(profile_.rampStartPps);
+            const double endPps = static_cast<double>(profile_.rampEndPps);
+
             double currentMs = 0.0;
-            while (currentMs < static_cast<double>(profile_.durationMs)) {
+            while (currentMs < static_cast<double>(profile_.durationMs) && !reachedEventLimit(events)) {
                 const double progress = currentMs / static_cast<double>(profile_.durationMs);
-                const double currentPps = static_cast<double>(profile_.rampStartPps) +
-                                          (static_cast<double>(profile_.rampEndPps - profile_.rampStartPps) * progress);
+                const double currentPps = startPps + ((endPps - startPps) * progress);
                 const double intervalMs = 1000.0 / std::max(1.0, currentPps);
+
                 TrafficEvent event;
                 event.timestampMs = static_cast<std::uint64_t>(currentMs);
                 event.payload = makePayload(profile_.packetSizeBytes, static_cast<std::uint8_t>((events.size() * 5U) & 0xFFU));
