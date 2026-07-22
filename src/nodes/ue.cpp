@@ -50,6 +50,9 @@ void Ue::startAttach(std::uint64_t nowMs) {
         datagram.controlPlane = true;
         datagram.bytes = encoded_msg;
 
+        metrics_.packetsSent += 1;
+        metrics_.bytesSent += datagram.bytes.size();
+
         outgoing_.push_back(datagram);
     }
 
@@ -79,6 +82,9 @@ void Ue::startDetach(std::uint64_t nowMs) {
         datagram.controlPlane = true;
         datagram.bytes = encoded_msg;
 
+        metrics_.packetsSent += 1;
+        metrics_.bytesSent += datagram.bytes.size();
+
         outgoing_.push_back(datagram);
 }
 
@@ -98,15 +104,14 @@ void Ue::sendTraffic(const std::vector<std::uint8_t>& payload, std::uint64_t now
         payload
     );
     //Update UE metrics_.
-    metrics_.bytesSent += payload.size();
-    metrics_.packetsSent += 1;
-    //Push a user-plane datagram to outgoing_.
-    Datagram datagram{};  //datagram.controlPlane = false;
+    Datagram datagram{};
     datagram.fromNodeId = nodeId_;
     datagram.toNodeId = accessNodeId_;
     datagram.enqueueTimeMs = nowMs;
-    
     datagram.bytes = FrameCodec::encode(msg);
+
+    metrics_.packetsSent += 1;
+    metrics_.bytesSent += datagram.bytes.size();
 
     outgoing_.push_back(datagram);
 }
