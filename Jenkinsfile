@@ -66,7 +66,7 @@ pipeline {
 
     post {
         always {
-            sh 'bash ci/scripts/ci_collect_logs.sh || true'
+            sh 'bash ci/scripts/ci_collect_logs.sh'
             junit testResults: 'ci_out/reports/**/*.xml', allowEmptyResults: false
             archiveArtifacts artifacts: 'ci_out/**/*', fingerprint: true, allowEmptyArchive: true
         }

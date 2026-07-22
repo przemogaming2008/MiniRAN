@@ -22,4 +22,4 @@ mkdir -p "$CI_LOG_DIR" "$CI_REPORT_DIR" "$CI_ARTIFACT_DIR"
   find "$CI_OUT" -maxdepth 3 -type f | sort
 } > "$CI_ARTIFACT_DIR/summary.md"
 
-tar -czf "$CI_ARTIFACT_DIR/miniran-ci-logs.tar.gz" "$CI_LOG_DIR" "$CI_REPORT_DIR" "$CI_ARTIFACT_DIR/summary.md" 2>/dev/null || true
+tar -czf "$CI_ARTIFACT_DIR/miniran-ci-logs.tar.gz" "$CI_LOG_DIR" "$CI_REPORT_DIR" "$CI_ARTIFACT_DIR/summary.md"
