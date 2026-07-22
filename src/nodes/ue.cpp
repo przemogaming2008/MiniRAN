@@ -184,10 +184,13 @@ void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
             return;
         }
 
-        if(protocolMessage.header.messageType == MessageType::AttachAccept){
-            //Update session state via SessionManager. (inside SessionManager methods)
-            sessionManager_.onAttachAccepted(protocolMessage.header.sessionId,nowMs);
-        } else if (protocolMessage.header.messageType == MessageType::DetachAccept){
+        if (protocolMessage.header.messageType == MessageType::AttachAccept) {
+            if (protocolMessage.header.sessionId == 0) {
+                return;
+            }
+
+            sessionManager_.onAttachAccepted(protocolMessage.header.sessionId, nowMs);
+        } else if (protocolMessage.header.messageType == MessageType::DetachAccept) {
             if (protocolMessage.header.sessionId != sessionManager_.sessionId()) {
                 return;
             }

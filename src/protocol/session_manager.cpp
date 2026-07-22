@@ -49,17 +49,26 @@ bool SessionManager::beginAttach(std::uint64_t nowMs) {
 
 bool SessionManager::onAttachAccepted(std::uint32_t sessionId, std::uint64_t nowMs) {
 
-    //Accept the session only if the current state is Attaching.
-    if(state() != SessionState::Attaching){
+    // Accept the session only if the current state is Attaching.
+    if (state() != SessionState::Attaching) {
         return false;
     }
-    //Store the assigned session id.
+
+    // Reject invalid session ids.
+    if (sessionId == 0) {
+        return false;
+    }
+
+    // Store the assigned session id.
     sessionId_ = sessionId;
-    //Move to Attached.
+
+    // Move to Attached.
     state_ = SessionState::Attached;
-    //Refresh activity timestamps.
+
+    // Refresh activity timestamps.
     lastControlTxMs_ = nowMs;
     lastHeartbeatAckMs_ = nowMs;
+
     return true;
 }
 
