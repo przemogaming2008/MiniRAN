@@ -1,11 +1,14 @@
 #include "miniran/simulation/scenario_config.h"
 
 #include <algorithm>
+#include <charconv>
+#include <cmath>
 #include <cctype>
 #include <fstream>
+#include <limits>
 #include <sstream>
+#include <system_error>
 #include <unordered_map>
-#include <exception>
 
 namespace miniran {
 
@@ -24,6 +27,86 @@ std::optional<std::string> readValue(const std::unordered_map<std::string, std::
         return std::nullopt;
     }
     return it->second;
+}
+
+bool parseUInt64Strict(const std::string& text, std::uint64_t& out) {
+    if (text.empty()) {
+        return false;
+    }
+
+    if (text.front() == '-' || text.front() == '+') {
+        return false;
+    }
+
+    std::uint64_t value = 0;
+    const char* begin = text.data();
+    const char* end = text.data() + text.size();
+
+    const auto [ptr, ec] = std::from_chars(begin, end, value, 10);
+
+    if (ec != std::errc{} || ptr != end) {
+        return false;
+    }
+
+    out = value;
+    return true;
+}
+
+bool parseUInt32Strict(const std::string& text, std::uint32_t& out) {
+    std::uint64_t value = 0;
+
+    if (!parseUInt64Strict(text, value)) {
+        return false;
+    }
+
+    if (value > std::numeric_limits<std::uint32_t>::max()) {
+        return false;
+    }
+
+    out = static_cast<std::uint32_t>(value);
+    return true;
+}
+
+bool parseSizeStrict(const std::string& text, std::size_t& out) {
+    std::uint64_t value = 0;
+
+    if (!parseUInt64Strict(text, value)) {
+        return false;
+    }
+
+    if (value > static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max())) {
+        return false;
+    }
+
+    out = static_cast<std::size_t>(value);
+    return true;
+}
+
+bool parseDoubleStrict(const std::string& text, double& out) {
+    if (text.empty()) {
+        return false;
+    }
+
+    if (text.front() == '-' || text.front() == '+') {
+        return false;
+    }
+
+    double value = 0.0;
+    const char* begin = text.data();
+    const char* end = text.data() + text.size();
+
+    const auto [ptr, ec] = std::from_chars(begin, end, value);
+
+    if (ec != std::errc{} || ptr != end) {
+        return false;
+    }
+
+    if (!std::isfinite(value)) {
+        return false;
+    }
+
+    out = value;
+    return true;
 }
 
 }  // namespace
@@ -58,48 +141,44 @@ std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, 
 
     auto parseUnsigned = [&](const std::string& key, std::uint64_t& target) -> bool {
         if (const auto value = readValue(values, key)) {
-            try {
-                target = std::stoull(*value);
-            } catch (const std::exception&) {
-                error = "Invalid unsigned integer value for key: " + key;
+            if (!parseUInt64Strict(*value, target)) {
+                error = "Invalid unsigned integer value for key: " + key + ", value: " + *value;
                 return false;
             }
         }
         return true;
     };
+
     auto parseUnsigned32 = [&](const std::string& key, std::uint32_t& target) -> bool {
         if (const auto value = readValue(values, key)) {
-            try {
-                target = static_cast<std::uint32_t>(std::stoul(*value));
-            } catch (const std::exception&) {
-                error = "Invalid uint32 value for key: " + key;
+            if (!parseUInt32Strict(*value, target)) {
+                error = "Invalid uint32 value for key: " + key + ", value: " + *value;
                 return false;
             }
         }
         return true;
     };
+
     auto parseSize = [&](const std::string& key, std::size_t& target) -> bool {
         if (const auto value = readValue(values, key)) {
-            try {
-                target = static_cast<std::size_t>(std::stoull(*value));
-            } catch (const std::exception&) {
-                error = "Invalid size value for key: " + key;
+            if (!parseSizeStrict(*value, target)) {
+                error = "Invalid size value for key: " + key + ", value: " + *value;
                 return false;
             }
         }
         return true;
     };
+
     auto parseDouble = [&](const std::string& key, double& target) -> bool {
         if (const auto value = readValue(values, key)) {
-            try {
-                target = std::stod(*value);
-            } catch (const std::exception&) {
-                error = "Invalid double value for key: " + key;
+            if (!parseDoubleStrict(*value, target)) {
+                error = "Invalid double value for key: " + key + ", value: " + *value;
                 return false;
             }
         }
         return true;
     };
+
     ScenarioConfig config;
 
     if (const auto value = readValue(values, "scenario_name")) {
@@ -151,16 +230,109 @@ std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, 
     if (!parseUnsigned32("ramp_start_pps", config.trafficProfile.rampStartPps)) return std::nullopt;
     if (!parseUnsigned32("ramp_end_pps", config.trafficProfile.rampEndPps)) return std::nullopt;
 
+    constexpr std::uint64_t maxReasonableDurationMs = 24ull * 60ull * 60ull * 1000ull;
+    constexpr std::uint64_t maxReasonableStepMs = 60ull * 1000ull;
+    constexpr std::uint32_t maxReasonableRetries = 1000u;
+    constexpr std::size_t maxReasonablePacketSizeBytes = 1024ull * 1024ull;
+    constexpr std::size_t maxReasonableQueueLimitPackets = 1'000'000ull;
+
+    if (config.ueId == 0) {
+        error = "ue_id must be > 0.";
+        return std::nullopt;
+    }
+
+    if (config.accessNodeId == 0) {
+        error = "access_node_id must be > 0.";
+        return std::nullopt;
+    }
+
+    if (config.ueId == config.accessNodeId) {
+        error = "ue_id and access_node_id must be different.";
+        return std::nullopt;
+    }
+
+    if (config.stepMs == 0) {
+        error = "step_ms must be > 0.";
+        return std::nullopt;
+    }
+
+    if (config.stepMs > maxReasonableStepMs) {
+        error = "step_ms is unreasonably large.";
+        return std::nullopt;
+    }
+
+    if (config.attachPhaseBudgetMs == 0) {
+        error = "attach_phase_budget_ms must be > 0.";
+        return std::nullopt;
+    }
+
+    if (config.detachPhaseBudgetMs == 0) {
+        error = "detach_phase_budget_ms must be > 0.";
+        return std::nullopt;
+    }
+
+    if (config.attachPhaseBudgetMs > maxReasonableDurationMs) {
+        error = "attach_phase_budget_ms is unreasonably large.";
+        return std::nullopt;
+    }
+
+    if (config.detachPhaseBudgetMs > maxReasonableDurationMs) {
+        error = "detach_phase_budget_ms is unreasonably large.";
+        return std::nullopt;
+    }
+
+    if (config.timers.attachTimeoutMs == 0) {
+        error = "attach_timeout_ms must be > 0.";
+        return std::nullopt;
+    }
+
+    if (config.timers.detachTimeoutMs == 0) {
+        error = "detach_timeout_ms must be > 0.";
+        return std::nullopt;
+    }
+
+    if (config.timers.heartbeatIntervalMs == 0) {
+        error = "heartbeat_interval_ms must be > 0.";
+        return std::nullopt;
+    }
+
+    if (config.timers.inactivityTimeoutMs == 0) {
+        error = "inactivity_timeout_ms must be > 0.";
+        return std::nullopt;
+    }
+
+    if (config.timers.maxAttachRetries > maxReasonableRetries) {
+        error = "max_attach_retries is unreasonably large.";
+        return std::nullopt;
+    }
+
+    if (config.timers.maxDetachRetries > maxReasonableRetries) {
+        error = "max_detach_retries is unreasonably large.";
+        return std::nullopt;
+    }
+
+    if (config.trafficProfile.durationMs > maxReasonableDurationMs) {
+        error = "traffic_duration_ms is unreasonably large.";
+        return std::nullopt;
+    }
+
+    if (config.trafficProfile.packetSizeBytes > maxReasonablePacketSizeBytes) {
+        error = "packet_size_bytes is unreasonably large.";
+        return std::nullopt;
+    }
+
+    if (config.linkProfile.queueLimitPackets > maxReasonableQueueLimitPackets) {
+        error = "queue_limit_packets is unreasonably large.";
+        return std::nullopt;
+    }
+
     if (!config.linkProfile.isValid()) {
         error = "Invalid LinkProfile values.";
         return std::nullopt;
     }
+
     if (!config.trafficProfile.isValid()) {
         error = "Invalid TrafficProfile values.";
-        return std::nullopt;
-    }
-    if (config.stepMs == 0) {
-        error = "step_ms must be > 0.";
         return std::nullopt;
     }
 
