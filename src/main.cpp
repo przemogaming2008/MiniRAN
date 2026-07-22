@@ -21,5 +21,5 @@ int main(int argc, char** argv) {
     const auto result = runner.run();
     std::cout << result.summary();
 
-    return (result.attachSucceeded && result.detachSucceeded) ? 0 : 3;
+    return result.isHealthy() ? 0 : 3;
 }

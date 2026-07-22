@@ -71,6 +71,7 @@ SimulationResult ScenarioRunner::run() {
         result.packetsDroppedInNetwork = network.metrics().packetsDropped;
         result.packetsDeliveredByNetwork = network.metrics().packetsDelivered;
         result.activeSessionsAtEnd = accessNode.coreNetwork().activeSessionCount();
+        result.expiredSessions = accessNode.coreNetwork().expiredSessions();
         return result;
     }
 
@@ -132,9 +133,29 @@ SimulationResult ScenarioRunner::run() {
                                       (static_cast<double>(config_.trafficProfile.durationMs) / 1000.0) / 1'000'000.0;
 
     result.expiredSessions = accessNode.coreNetwork().expiredSessions();
-    
-    if (result.bytesDeliveredToCore == 0) {
+
+    if (result.expiredSessions > 0) {
+        result.notes.push_back("At least one CoreNetwork session expired unexpectedly.");
+    }
+
+    if (result.bytesGenerated > 0 && result.bytesDeliveredToCore == 0) {
         result.notes.push_back("No user-plane payload reached the simplified core.");
+    }
+
+    if (result.packetsGenerated > 0 && result.packetsDeliveredToCore == 0) {
+        result.notes.push_back("No user-plane packet reached the simplified core.");
+    }
+
+    if (result.finalUeState != SessionState::Released) {
+        result.notes.push_back("Final UE state is not Released.");
+    }
+
+    if (result.activeSessionsAtEnd != 0) {
+        result.notes.push_back("CoreNetwork still has active sessions at the end.");
+    }
+
+    if (!result.isHealthy()) {
+        result.notes.push_back("Scenario result is unhealthy.");
     }
 
     return result;

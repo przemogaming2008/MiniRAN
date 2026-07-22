@@ -9,6 +9,7 @@
 namespace miniran {
 
 struct SimulationResult {
+    bool isHealthy() const;
     std::string scenarioName;
     std::size_t totalDurationMs = 0;
     bool attachSucceeded = false;

@@ -5,6 +5,42 @@
 
 namespace miniran {
 
+bool SimulationResult::isHealthy() const {
+    if (!attachSucceeded) {
+        return false;
+    }
+
+    if (!trafficStarted) {
+        return false;
+    }
+
+    if (!detachSucceeded) {
+        return false;
+    }
+
+    if (finalUeState != SessionState::Released) {
+        return false;
+    }
+
+    if (activeSessionsAtEnd != 0) {
+        return false;
+    }
+
+    if (expiredSessions != 0) {
+        return false;
+    }
+
+    if (bytesGenerated > 0 && bytesDeliveredToCore == 0) {
+        return false;
+    }
+
+    if (packetsGenerated > 0 && packetsDeliveredToCore == 0) {
+        return false;
+    }
+
+    return true;
+}
+
 std::string SimulationResult::summary() const {
     std::ostringstream output;
     output << "Scenario: " << scenarioName << '\n';
@@ -12,6 +48,7 @@ std::string SimulationResult::summary() const {
     output << "Attach succeeded: " << (attachSucceeded ? "yes" : "no") << '\n';
     output << "Traffic started: " << (trafficStarted ? "yes" : "no") << '\n';
     output << "Detach succeeded: " << (detachSucceeded ? "yes" : "no") << '\n';
+    output << "Healthy result: " << (isHealthy() ? "yes" : "no") << '\n';
     output << "Final UE state: " << toString(finalUeState) << '\n';
     output << "Packets generated: " << packetsGenerated << '\n';
     output << "Bytes generated: " << bytesGenerated << '\n';
@@ -20,6 +57,7 @@ std::string SimulationResult::summary() const {
     output << "Packets dropped in network: " << packetsDroppedInNetwork << '\n';
     output << "Packets delivered by network: " << packetsDeliveredByNetwork << '\n';
     output << "Active sessions at end: " << activeSessionsAtEnd << '\n';
+    output << "Expired sessions: " << expiredSessions << '\n';
     output << std::fixed << std::setprecision(3) << "Throughput [Mbps]: " << throughputMbps << '\n';
     if (!notes.empty()) {
         output << "Notes:" << '\n';
