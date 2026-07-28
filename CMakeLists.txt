@@ -34,23 +34,24 @@ target_link_libraries(miniran_cli PRIVATE miniran_lib)
 
 if(MINIRAN_BUILD_TESTS)
     enable_testing()
+
     set(MINIRAN_UNIT_TEST_SOURCES
-    tests/unit/test_frame_codec.cpp
-    tests/unit/test_traffic_generator.cpp
-    tests/unit/test_link_profile.cpp
-    tests/unit/test_virtual_network.cpp
-    tests/unit/test_session_manager.cpp
-    tests/unit/test_duplicate_attach_request.cpp
-    tests/unit/test_data_after_detach.cpp
-    tests/unit/test_detach_after_session_expiration.cpp
-    tests/unit/test_reattach_after_released.cpp
-    tests/unit/test_detach_in_invalid_states.cpp
-    tests/unit/test_data_after_session_expiration.cpp
-    tests/unit/test_data_with_wrong_session_id.cpp
-    tests/unit/test_detach_with_wrong_session_id.cpp
-    tests/unit/test_attach_validate.cpp
-    tests/unit/test_config_invalid_numeric_value.cpp
-    tests/unit/test_data_with_zero_length_payload.cpp
+        tests/unit/test_frame_codec.cpp
+        tests/unit/test_traffic_generator.cpp
+        tests/unit/test_link_profile.cpp
+        tests/unit/test_virtual_network.cpp
+        tests/unit/test_session_manager.cpp
+        tests/unit/test_duplicate_attach_request.cpp
+        tests/unit/test_data_after_detach.cpp
+        tests/unit/test_detach_after_session_expiration.cpp
+        tests/unit/test_reattach_after_released.cpp
+        tests/unit/test_detach_in_invalid_states.cpp
+        tests/unit/test_data_after_session_expiration.cpp
+        tests/unit/test_data_with_wrong_session_id.cpp
+        tests/unit/test_detach_with_wrong_session_id.cpp
+        tests/unit/test_attach_validate.cpp
+        tests/unit/test_config_invalid_numeric_value.cpp
+        tests/unit/test_data_with_zero_length_payload.cpp
     )
 
     set(MINIRAN_COMPONENT_TEST_SOURCES
@@ -74,11 +75,6 @@ if(MINIRAN_BUILD_TESTS)
     add_miniran_test_binary(miniran_unit_tests ${MINIRAN_UNIT_TEST_SOURCES})
     add_miniran_test_binary(miniran_component_tests ${MINIRAN_COMPONENT_TEST_SOURCES})
     add_miniran_test_binary(miniran_mega_tests ${MINIRAN_MEGA_TEST_SOURCES})
-    add_miniran_test_binary(miniran_tests
-        ${MINIRAN_UNIT_TEST_SOURCES}
-        ${MINIRAN_COMPONENT_TEST_SOURCES}
-        ${MINIRAN_MEGA_TEST_SOURCES}
-    )
 
     add_test(NAME unit_tests COMMAND miniran_unit_tests)
     set_tests_properties(unit_tests PROPERTIES
@@ -97,11 +93,4 @@ if(MINIRAN_BUILD_TESTS)
         LABELS "mega"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     )
-
-    add_test(NAME all_tests COMMAND miniran_tests)
-    set_tests_properties(all_tests PROPERTIES
-        LABELS "all"
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    )
-
 endif()
