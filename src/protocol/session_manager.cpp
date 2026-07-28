@@ -152,8 +152,7 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
             lastControlTxMs_ = nowMs;
             return {true, MessageType::DetachRequest};
         } else {
-            //detach retries exhausted.
-            state_ = SessionState::Released;
+            state_ = SessionState::Rejected;
             sessionId_ = 0;
             detachRetryCount_ = 0;
             lastControlTxMs_ = nowMs;
