@@ -17,8 +17,21 @@ struct LinkProfile {
     std::size_t queueLimitPackets = 256;
 
     bool isValid() const {
-        return bandwidthKbps > 0 && lossPercent >= 0.0 && lossPercent <= 100.0 && reorderPercent >= 0.0 &&
-               reorderPercent <= 100.0 && queueLimitPackets > 0;
+        constexpr std::uint32_t maxReasonableLatencyMs = 60'000;
+        constexpr std::uint32_t maxReasonableJitterMs = 60'000;
+        constexpr std::uint64_t maxReasonableBandwidthKbps = 100'000'000;
+        constexpr std::size_t maxReasonableQueueLimitPackets = 1'000'000;
+
+        return latencyMs <= maxReasonableLatencyMs &&
+            jitterMs <= maxReasonableJitterMs &&
+            lossPercent >= 0.0 &&
+            lossPercent <= 100.0 &&
+            reorderPercent >= 0.0 &&
+            reorderPercent <= 100.0 &&
+            bandwidthKbps > 0 &&
+            bandwidthKbps <= maxReasonableBandwidthKbps &&
+            queueLimitPackets > 0 &&
+            queueLimitPackets <= maxReasonableQueueLimitPackets;
     }
 };
 

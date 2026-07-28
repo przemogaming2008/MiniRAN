@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace miniran {
 
@@ -28,27 +29,42 @@ bool VirtualNetwork::submit(Datagram datagram, std::uint64_t nowMs) {
         return false;
     }
 
-    const auto jitterRange = static_cast<int>(profile_.jitterMs);
-    std::uniform_int_distribution<int> jitterDistribution(-jitterRange, jitterRange);
-    const int jitterValue = (profile_.jitterMs == 0) ? 0 : jitterDistribution(rng_);
+    const auto latencyMs = static_cast<std::int64_t>(profile_.latencyMs);
+    const auto jitterRangeMs = static_cast<std::int64_t>(profile_.jitterMs);
 
-    const std::uint64_t serializationDelayMs = static_cast<std::uint64_t>(
-        std::ceil((static_cast<double>(datagram.bytes.size()) * 8.0) / static_cast<double>(profile_.bandwidthKbps)));
-
-    const std::uint64_t scheduledTxMs = std::max(nowMs, nextAvailableTxMs_);
-    nextAvailableTxMs_ = scheduledTxMs + serializationDelayMs;
-
-    std::uint64_t baseDelay = profile_.latencyMs;
-    if (jitterValue < 0 && static_cast<std::uint32_t>(-jitterValue) > baseDelay) {
-        baseDelay = 0;
-    } else {
-        baseDelay = static_cast<std::uint64_t>(static_cast<int>(baseDelay) + jitterValue);
+    std::int64_t jitterValueMs = 0;
+    if (jitterRangeMs > 0) {
+        std::uniform_int_distribution<std::int64_t> jitterDistribution(-jitterRangeMs, jitterRangeMs);
+        jitterValueMs = jitterDistribution(rng_);
     }
 
-    datagram.deliverAtMs = scheduledTxMs + serializationDelayMs + baseDelay;
+    const std::uint64_t serializationDelayMs = static_cast<std::uint64_t>(
+        std::ceil((static_cast<double>(datagram.bytes.size()) * 8.0) /
+                static_cast<double>(profile_.bandwidthKbps)));
+
+    const std::uint64_t scheduledTxMs = std::max(nowMs, nextAvailableTxMs_);
+
+    if (serializationDelayMs > std::numeric_limits<std::uint64_t>::max() - scheduledTxMs) {
+        return false;
+    }
+
+    const std::uint64_t txDoneMs = scheduledTxMs + serializationDelayMs;
+    nextAvailableTxMs_ = txDoneMs;
+
+    const std::int64_t delayWithJitterMs = std::max<std::int64_t>(0, latencyMs + jitterValueMs);
+    const std::uint64_t baseDelay = static_cast<std::uint64_t>(delayWithJitterMs);
+
+    if (baseDelay > std::numeric_limits<std::uint64_t>::max() - txDoneMs) {
+        return false;
+    }
+
+    datagram.deliverAtMs = txDoneMs + baseDelay;
 
     if (profile_.mode == TransportMode::Udp && probability_(rng_) < profile_.reorderPercent) {
-        const std::uint64_t advanceMs = std::min<std::uint64_t>(profile_.latencyMs / 2U, datagram.deliverAtMs - nowMs);
+        const std::uint64_t advanceMs = std::min<std::uint64_t>(
+            profile_.latencyMs / 2U,
+            datagram.deliverAtMs - nowMs
+        );
         datagram.deliverAtMs -= advanceMs;
     }
 
