@@ -15,3 +15,21 @@ ctest --test-dir "$ROOT_DIR/$BUILD_DIR" \
   --output-on-failure \
   --output-log "$ROOT_DIR/$CI_LOG_DIR/mega-gate.log" \
   --output-junit "$ROOT_DIR/$CI_REPORT_DIR/mega-gate.xml"
+
+MEGA_BIN="$ROOT_DIR/$BUILD_DIR/miniran_mega_tests"
+
+if [[ -x "$ROOT_DIR/$BUILD_DIR/Debug/miniran_mega_tests.exe" ]]; then
+  MEGA_BIN="$ROOT_DIR/$BUILD_DIR/Debug/miniran_mega_tests.exe"
+elif [[ -x "$ROOT_DIR/$BUILD_DIR/Release/miniran_mega_tests.exe" ]]; then
+  MEGA_BIN="$ROOT_DIR/$BUILD_DIR/Release/miniran_mega_tests.exe"
+elif [[ -x "$ROOT_DIR/$BUILD_DIR/miniran_mega_tests.exe" ]]; then
+  MEGA_BIN="$ROOT_DIR/$BUILD_DIR/miniran_mega_tests.exe"
+elif [[ -x "$ROOT_DIR/$BUILD_DIR/miniran_mega_tests" ]]; then
+  MEGA_BIN="$ROOT_DIR/$BUILD_DIR/miniran_mega_tests"
+else
+  echo "[CI] ERROR: miniran_mega_tests binary not found" | tee -a "$ROOT_DIR/$CI_LOG_DIR/mega-internal.log"
+  exit 1
+fi
+
+"$MEGA_BIN" --junit "$ROOT_DIR/$CI_REPORT_DIR/mega-internal.xml" \
+  2>&1 | tee "$ROOT_DIR/$CI_LOG_DIR/mega-internal.log"
