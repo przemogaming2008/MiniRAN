@@ -1,4 +1,21 @@
 #include "miniran/protocol/session_manager.h"
+
+namespace
+{
+
+bool elapsedAtLeast(std::uint64_t nowMs,
+                    std::uint64_t sinceMs,
+                    std::uint64_t durationMs)
+{
+    if (nowMs < sinceMs) {
+        return false;
+    }
+
+    return (nowMs - sinceMs) >= durationMs;
+}
+
+}  // namespace
+
 namespace miniran {
 
 SessionManager::SessionManager(std::uint32_t ueId, SessionTimers timers) : ueId_(ueId), timers_(timers) {}
@@ -114,7 +131,7 @@ void SessionManager::onHeartbeatResponse(std::uint64_t nowMs) {
 RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
 
     //- If Attaching and timeout expired, request retransmission of AttachRequest.
-    if(state_ == SessionState::Attaching && (nowMs - lastControlTxMs_) >= timers_.attachTimeoutMs){
+    if(state_ == SessionState::Attaching && elapsedAtLeast(nowMs, lastControlTxMs_, timers_.attachTimeoutMs)){
         if (attachRetryCount_ < timers_.maxAttachRetries) {
             ++attachRetryCount_;
             lastControlTxMs_ = nowMs;
@@ -128,7 +145,7 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
     }
     //- If Detaching and timeout expired, request retransmission of DetachRequest.
     if (state_ == SessionState::Detaching &&
-        (nowMs - lastControlTxMs_) >= timers_.detachTimeoutMs)
+        elapsedAtLeast(nowMs, lastControlTxMs_, timers_.detachTimeoutMs))
     {
         if (detachRetryCount_ < timers_.maxDetachRetries) {
             ++detachRetryCount_;
@@ -147,7 +164,7 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
     }
     // If Attached and heartbeat ACK timeout expired, consider the local session lost.
     if (state_ == SessionState::Attached &&
-        (nowMs - lastHeartbeatAckMs_) >= timers_.inactivityTimeoutMs)
+        elapsedAtLeast(nowMs, lastHeartbeatAckMs_, timers_.inactivityTimeoutMs))
     {
         state_ = SessionState::Rejected;
         sessionId_ = 0;
@@ -160,7 +177,7 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
     }
     //- If Attached and heartbeat interval elapsed, you may also request a Heartbeat.
     if (state_ == SessionState::Attached &&
-    (nowMs - lastHeartbeatTxMs_) >= timers_.heartbeatIntervalMs)
+        elapsedAtLeast(nowMs, lastHeartbeatTxMs_, timers_.heartbeatIntervalMs))
     {
         lastHeartbeatTxMs_ = nowMs;
         return {true, MessageType::Heartbeat};
