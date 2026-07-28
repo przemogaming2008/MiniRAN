@@ -4,31 +4,42 @@
 
 namespace miniran {
 
-AccessNode::AccessNode(std::uint32_t nodeId, std::uint32_t ueNodeId, CoreNetwork coreNetwork)
-    : nodeId_(nodeId), ueNodeId_(ueNodeId), coreNetwork_(std::move(coreNetwork)) {}
+AccessNode::AccessNode(std::uint32_t nodeId,
+                       std::uint32_t ueNodeId,
+                       CoreNetwork coreNetwork)
+    : nodeId_(nodeId),
+      ueNodeId_(ueNodeId),
+      coreNetwork_(std::move(coreNetwork))
+{
+}
 
-std::uint32_t AccessNode::nodeId() const {
+std::uint32_t AccessNode::nodeId() const
+{
     return nodeId_;
 }
 
-const FlowMetrics& AccessNode::metrics() const {
+const FlowMetrics& AccessNode::metrics() const
+{
     return metrics_;
 }
 
-const CoreNetwork& AccessNode::coreNetwork() const {
+const CoreNetwork& AccessNode::coreNetwork() const
+{
     return coreNetwork_;
 }
 
-CoreNetwork& AccessNode::coreNetwork() {
+CoreNetwork& AccessNode::coreNetwork()
+{
     return coreNetwork_;
 }
 
-void AccessNode::tick(std::uint64_t nowMs) {
+void AccessNode::tick(std::uint64_t nowMs)
+{
     coreNetwork_.expireInactiveSessions(nowMs);
 }
 
-void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
-
+void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs)
+{
     if (datagram.toNodeId != nodeId_) {
         metrics_.packetsDropped += 1;
         return;
@@ -39,18 +50,20 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
         return;
     }
 
+    const auto requestSenderNodeId = datagram.fromNodeId;
+
     std::string error;
-    std::optional<ProtocolMessage> decode_opt = FrameCodec::decode(datagram.bytes, error);
+    std::optional<ProtocolMessage> decodeOpt =
+        FrameCodec::decode(datagram.bytes, error);
 
-    if (!decode_opt) {
+    if (!decodeOpt) {
         metrics_.packetsDropped += 1;
-
         return;
     }
 
-    ProtocolMessage protocolMessage = *decode_opt;
+    ProtocolMessage protocolMessage = *decodeOpt;
 
-    if (protocolMessage.header.ueId != datagram.fromNodeId) {
+    if (protocolMessage.header.ueId != requestSenderNodeId) {
         metrics_.packetsDropped += 1;
         return;
     }
@@ -64,10 +77,13 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
         metrics_.packetsDelivered += 1;
         metrics_.bytesDelivered += datagram.bytes.size();
 
-        std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleAttachRequest(protocolMessage, nowMs);
-        if (msg_opt) {
-            queueResponseToUe(*msg_opt, nowMs);
+        std::optional<ProtocolMessage> msgOpt =
+            coreNetwork_.handleAttachRequest(protocolMessage, nowMs);
+
+        if (msgOpt) {
+            queueResponseToUe(*msgOpt, requestSenderNodeId, nowMs);
         }
+
         return;
     }
 
@@ -75,10 +91,13 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
         metrics_.packetsDelivered += 1;
         metrics_.bytesDelivered += datagram.bytes.size();
 
-        std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleHeartbeat(protocolMessage, nowMs);
-        if (msg_opt) {
-            queueResponseToUe(*msg_opt, nowMs);
+        std::optional<ProtocolMessage> msgOpt =
+            coreNetwork_.handleHeartbeat(protocolMessage, nowMs);
+
+        if (msgOpt) {
+            queueResponseToUe(*msgOpt, requestSenderNodeId, nowMs);
         }
+
         return;
     }
 
@@ -94,10 +113,13 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
         metrics_.packetsDelivered += 1;
         metrics_.bytesDelivered += datagram.bytes.size();
 
-        std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleDetachRequest(protocolMessage, nowMs);
-        if (msg_opt) {
-            queueResponseToUe(*msg_opt, nowMs);
+        std::optional<ProtocolMessage> msgOpt =
+            coreNetwork_.handleDetachRequest(protocolMessage, nowMs);
+
+        if (msgOpt) {
+            queueResponseToUe(*msgOpt, requestSenderNodeId, nowMs);
         }
+
         return;
     }
 
@@ -110,25 +132,31 @@ void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
     msg.header.sequenceNumber = protocolMessage.header.sequenceNumber;
     msg.header.timestampMs = nowMs;
 
-    queueResponseToUe(msg, nowMs);
+    queueResponseToUe(msg, requestSenderNodeId, nowMs);
 }
 
-std::vector<Datagram> AccessNode::flushOutgoing() {
+std::vector<Datagram> AccessNode::flushOutgoing()
+{
     std::vector<Datagram> datagrams;
     datagrams.reserve(outgoing_.size());
+
     while (!outgoing_.empty()) {
         datagrams.push_back(std::move(outgoing_.front()));
         outgoing_.pop_front();
     }
+
     return datagrams;
 }
 
-void AccessNode::queueResponseToUe(const ProtocolMessage& message, std::uint64_t nowMs) {
+void AccessNode::queueResponseToUe(const ProtocolMessage& message,
+                                   std::uint32_t toNodeId,
+                                   std::uint64_t nowMs)
+{
     std::vector<std::uint8_t> encoded = FrameCodec::encode(message);
 
     Datagram response{};
     response.fromNodeId = nodeId_;
-    response.toNodeId = ueNodeId_;
+    response.toNodeId = toNodeId;
     response.enqueueTimeMs = nowMs;
     response.controlPlane = true;
     response.bytes = encoded;
