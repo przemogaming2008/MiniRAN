@@ -23,14 +23,20 @@ add_library(miniran_lib
 )
 
 target_include_directories(miniran_lib PUBLIC include)
-if(MSVC)
-    target_compile_options(miniran_lib PRIVATE /W4)
-else()
-    target_compile_options(miniran_lib PRIVATE -Wall -Wextra -Wpedantic)
-endif()
+
+function(configure_miniran_warnings target_name)
+    if(MSVC)
+        target_compile_options(${target_name} PRIVATE /W4)
+    else()
+        target_compile_options(${target_name} PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+endfunction()
+
+configure_miniran_warnings(miniran_lib)
 
 add_executable(miniran_cli src/main.cpp)
 target_link_libraries(miniran_cli PRIVATE miniran_lib)
+configure_miniran_warnings(miniran_cli)
 
 if(MINIRAN_BUILD_TESTS)
     enable_testing()
@@ -70,6 +76,7 @@ if(MINIRAN_BUILD_TESTS)
         add_executable(${target_name} tests/test_main.cpp ${ARGN})
         target_link_libraries(${target_name} PRIVATE miniran_lib)
         target_include_directories(${target_name} PRIVATE tests)
+        configure_miniran_warnings(${target_name})
     endfunction()
 
     add_miniran_test_binary(miniran_unit_tests ${MINIRAN_UNIT_TEST_SOURCES})
