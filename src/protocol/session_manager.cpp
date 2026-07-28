@@ -103,7 +103,11 @@ bool SessionManager::onDetachAccepted(std::uint64_t nowMs) {
 
 void SessionManager::onHeartbeatResponse(std::uint64_t nowMs) {
 
-    //Update the last successful activity timestamp.
+    if (state_ != SessionState::Attached) {
+        return;
+    }
+
+    // Update the last successful heartbeat ACK timestamp.
     lastHeartbeatAckMs_ = nowMs;
 }
 
@@ -140,6 +144,19 @@ RetryDecision SessionManager::onTick(std::uint64_t nowMs) {
             lastHeartbeatAckMs_ = 0;
             return {};
         }
+    }
+    // If Attached and heartbeat ACK timeout expired, consider the local session lost.
+    if (state_ == SessionState::Attached &&
+        (nowMs - lastHeartbeatAckMs_) >= timers_.inactivityTimeoutMs)
+    {
+        state_ = SessionState::Rejected;
+        sessionId_ = 0;
+        lastControlTxMs_ = nowMs;
+        lastHeartbeatTxMs_ = 0;
+        lastHeartbeatAckMs_ = 0;
+        attachRetryCount_ = 0;
+        detachRetryCount_ = 0;
+        return {};
     }
     //- If Attached and heartbeat interval elapsed, you may also request a Heartbeat.
     if (state_ == SessionState::Attached &&
