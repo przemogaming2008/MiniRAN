@@ -9,6 +9,7 @@
 #include <sstream>
 #include <system_error>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace miniran {
 
@@ -27,6 +28,44 @@ std::optional<std::string> readValue(const std::unordered_map<std::string, std::
         return std::nullopt;
     }
     return it->second;
+}
+
+const std::unordered_set<std::string>& knownConfigKeys() {
+    static const std::unordered_set<std::string> keys = {
+        "scenario_name",
+        "transport_mode",
+        "traffic_pattern",
+
+        "ue_id",
+        "access_node_id",
+        "step_ms",
+        "attach_phase_budget_ms",
+        "detach_phase_budget_ms",
+
+        "attach_timeout_ms",
+        "detach_timeout_ms",
+        "heartbeat_interval_ms",
+        "inactivity_timeout_ms",
+        "max_attach_retries",
+        "max_detach_retries",
+
+        "latency_ms",
+        "jitter_ms",
+        "loss_percent",
+        "reorder_percent",
+        "bandwidth_kbps",
+        "queue_limit_packets",
+
+        "traffic_duration_ms",
+        "packet_size_bytes",
+        "packets_per_second",
+        "burst_packets",
+        "burst_interval_ms",
+        "ramp_start_pps",
+        "ramp_end_pps"
+    };
+
+    return keys;
 }
 
 bool parseUInt64Strict(const std::string& text, std::uint64_t& out) {
@@ -120,22 +159,45 @@ std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, 
 
     std::unordered_map<std::string, std::string> values;
     std::string line;
+    std::size_t lineNumber = 0;
+
     while (std::getline(input, line)) {
+        ++lineNumber;
+
         const auto commentPos = line.find('#');
         if (commentPos != std::string::npos) {
             line = line.substr(0, commentPos);
         }
+
         line = trim(line);
         if (line.empty()) {
             continue;
         }
+
         const auto separatorPos = line.find('=');
         if (separatorPos == std::string::npos) {
-            error = "Invalid config line: " + line;
+            error = "Invalid config line " + std::to_string(lineNumber) + ": " + line;
             return std::nullopt;
         }
+
         const std::string key = trim(line.substr(0, separatorPos));
         const std::string value = trim(line.substr(separatorPos + 1));
+
+        if (key.empty()) {
+            error = "Empty config key at line " + std::to_string(lineNumber);
+            return std::nullopt;
+        }
+
+        if (knownConfigKeys().find(key) == knownConfigKeys().end()) {
+            error = "Unknown config key at line " + std::to_string(lineNumber) + ": " + key;
+            return std::nullopt;
+        }
+
+        if (values.find(key) != values.end()) {
+            error = "Duplicate config key at line " + std::to_string(lineNumber) + ": " + key;
+            return std::nullopt;
+        }
+
         values[key] = value;
     }
 
