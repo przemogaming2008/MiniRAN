@@ -199,6 +199,9 @@ inline int runAllTests(const std::string& junitPath = {}) {
             result.message = ex.what();
             std::cout << "[FAIL] " << test.name << "\n       " << ex.what() << '\n';
             ++failed;
+        } catch (...) {
+            result.passed = false;
+            result.message = "Unknown non-std exception";
         }
 
         const auto end = std::chrono::steady_clock::now();
