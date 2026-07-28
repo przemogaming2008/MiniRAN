@@ -5,7 +5,8 @@ set -Eeuo pipefail
 : "${CI_LOG_DIR:=ci_out/logs}"
 : "${CI_REPORT_DIR:=ci_out/reports}"
 
-ROOT_DIR="$(pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 mkdir -p "$ROOT_DIR/$CI_LOG_DIR" "$ROOT_DIR/$CI_REPORT_DIR"
 

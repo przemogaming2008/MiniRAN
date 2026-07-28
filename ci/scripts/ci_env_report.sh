@@ -6,7 +6,8 @@ set -Eeuo pipefail
 : "${MIN_CTEST_VERSION:=3.21.0}"
 : "${MIN_FREE_SPACE_KB:=524288}"
 
-ROOT_DIR="$(pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 mkdir -p "$ROOT_DIR/$CI_LOG_DIR"
 
 LOG="$ROOT_DIR/$CI_LOG_DIR/env.txt"
