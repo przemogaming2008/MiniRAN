@@ -109,13 +109,25 @@ SimulationResult ScenarioRunner::run() {
         deliverReady(network, ue, accessNode, nowMs);
     }
 
-    result.detachSucceeded = !ue.isAttached() && accessNode.coreNetwork().activeSessionCount() == 0;
+    result.detachSucceeded =
+        ue.state() == SessionState::Released &&
+        accessNode.coreNetwork().activeSessionCount() == 0 &&
+        accessNode.coreNetwork().expiredSessions() == 0;
+
     if (!result.detachSucceeded) {
-         if (!ue.isAttached() && accessNode.coreNetwork().activeSessionCount() > 0) {
-        result.notes.push_back(
-            "UE left Attached state, but CoreNetwork still has an active session."
-        );
-        } else {
+        if (ue.state() != SessionState::Released) {
+            result.notes.push_back("Detach was not confirmed by DetachAccept.");
+        }
+
+        if (accessNode.coreNetwork().activeSessionCount() > 0) {
+            result.notes.push_back("CoreNetwork still has an active session after detach phase.");
+        }
+
+        if (accessNode.coreNetwork().expiredSessions() > 0) {
+            result.notes.push_back("CoreNetwork session expired instead of being detached cleanly.");
+        }
+
+        if (result.notes.empty()) {
             result.notes.push_back("Detach phase did not close the session cleanly.");
         }
     }
