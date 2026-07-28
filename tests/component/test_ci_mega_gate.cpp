@@ -24,6 +24,28 @@ void assertScenarioHealthy(const SimulationResult& result) {
     ASSERT_TRUE(result.bytesDeliveredToCore > 0);
 }
 
+void assertSameScenarioResult(const SimulationResult& expected, const SimulationResult& actual) {
+    ASSERT_EQ(actual.attachSucceeded, expected.attachSucceeded);
+    ASSERT_EQ(actual.trafficStarted, expected.trafficStarted);
+    ASSERT_EQ(actual.detachSucceeded, expected.detachSucceeded);
+
+    ASSERT_TRUE(actual.finalUeState == expected.finalUeState);
+
+    ASSERT_EQ(actual.packetsGenerated, expected.packetsGenerated);
+    ASSERT_EQ(actual.bytesGenerated, expected.bytesGenerated);
+
+    ASSERT_EQ(actual.packetsDeliveredToCore, expected.packetsDeliveredToCore);
+    ASSERT_EQ(actual.bytesDeliveredToCore, expected.bytesDeliveredToCore);
+
+    ASSERT_EQ(actual.packetsDroppedInNetwork, expected.packetsDroppedInNetwork);
+    ASSERT_EQ(actual.packetsDeliveredByNetwork, expected.packetsDeliveredByNetwork);
+
+    ASSERT_EQ(actual.activeSessionsAtEnd, expected.activeSessionsAtEnd);
+    ASSERT_EQ(actual.expiredSessions, expected.expiredSessions);
+
+    ASSERT_EQ(actual.totalDurationMs, expected.totalDurationMs);
+}
+
 double offeredThroughputMbps(const SimulationResult& result, std::uint64_t durationMs) {
     return (durationMs == 0)
                ? 0.0
@@ -59,8 +81,12 @@ TEST_CASE(component_ci_low_bandwidth_limits_throughput_but_not_session) {
 }
 
 TEST_CASE(component_ci_repeated_tcp_runs_are_deterministic) {
+    const auto reference = runScenarioFile("scenarios/ci_tcp_heavy.cfg");
+    assertScenarioHealthy(reference);
+
     for (int i = 0; i < 20; ++i) {
         const auto result = runScenarioFile("scenarios/ci_tcp_heavy.cfg");
         assertScenarioHealthy(result);
+        assertSameScenarioResult(reference, result);
     }
 }
