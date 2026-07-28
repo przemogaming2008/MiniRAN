@@ -18,6 +18,7 @@ struct SessionRecord {
     std::uint64_t lastSeenMs = 0;
     std::size_t deliveredBytes = 0;
     std::size_t deliveredPackets = 0;
+    std::uint32_t lastAcceptedSequenceNumber = 0;
 };
 
 class CoreNetwork {

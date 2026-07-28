@@ -63,6 +63,7 @@ std::optional<ProtocolMessage> CoreNetwork::handleAttachRequest(const ProtocolMe
     sessionRecord.sessionId = new_session_id;
     sessionRecord.attachedAtMs = nowMs;
     sessionRecord.lastSeenMs = nowMs;
+    sessionRecord.lastAcceptedSequenceNumber = request.header.sequenceNumber;
 
     sessions_[request.header.ueId] = sessionRecord;
     //Return AttachAccept with the session id.
@@ -100,6 +101,12 @@ std::optional<ProtocolMessage> CoreNetwork::handleDetachRequest(const ProtocolMe
         return protocolMessage;
     }
 
+    if (request.header.sequenceNumber <= it->second.lastAcceptedSequenceNumber) {
+        return std::nullopt;
+    }
+
+    it->second.lastAcceptedSequenceNumber = request.header.sequenceNumber;
+
     sessions_.erase(it);
 
     protocolMessage.header.messageType = MessageType::DetachAccept;
@@ -128,6 +135,11 @@ std::optional<ProtocolMessage> CoreNetwork::handleHeartbeat(const ProtocolMessag
         return std::nullopt;
     }
 
+    if (request.header.sequenceNumber <= session.lastAcceptedSequenceNumber) {
+        return std::nullopt;
+    }
+
+    session.lastAcceptedSequenceNumber = request.header.sequenceNumber;
     session.lastSeenMs = nowMs;
 
     ProtocolMessage msg = makeMessage(
@@ -165,6 +177,11 @@ void CoreNetwork::handleData(const ProtocolMessage& request, std::uint64_t nowMs
     if (request.payload.empty()) {
         return;
     }
+    if (request.header.sequenceNumber <= session.lastAcceptedSequenceNumber) {
+        return;
+    }
+
+    session.lastAcceptedSequenceNumber = request.header.sequenceNumber;
     //Count delivered bytes and packets.
     session.deliveredBytes += request.payload.size();
     session.deliveredPackets += 1;
