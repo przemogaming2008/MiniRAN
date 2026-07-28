@@ -1,2 +1,14 @@
 build/
 ci_out/
+
+# Local CTest/Jenkins artifacts accidentally generated in repository root
+/Testing/
+/DartConfiguration.tcl
+/CTestTestfile.cmake
+/Testing.xml
+
+/*.log
+/*.xml
+
+/invalid_numeric.cfg
+/tmp_invalid_*.cfg
