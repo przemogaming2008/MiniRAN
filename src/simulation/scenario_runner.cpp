@@ -1,5 +1,6 @@
 #include "miniran/simulation/scenario_runner.h"
 
+#include <string>
 #include <utility>
 
 #include "miniran/nodes/access_node.h"
@@ -11,9 +12,24 @@ namespace miniran {
 
 namespace {
 
-void submitOutgoing(VirtualNetwork& network, std::vector<Datagram> datagrams, std::uint64_t nowMs) {
+std::size_t submitOutgoing(VirtualNetwork& network, std::vector<Datagram> datagrams, std::uint64_t nowMs) {
+    std::size_t rejected = 0;
+
     for (auto& datagram : datagrams) {
-        network.submit(std::move(datagram), nowMs);
+        if (!network.submit(std::move(datagram), nowMs)) {
+            ++rejected;
+        }
+    }
+
+    return rejected;
+}
+
+void addRejectedNetworkSubmissionsNote(SimulationResult& result, std::size_t rejectedNetworkSubmissions) {
+    if (rejectedNetworkSubmissions > 0) {
+        result.notes.push_back(
+            "VirtualNetwork rejected " + std::to_string(rejectedNetworkSubmissions) +
+            " outgoing datagram submissions."
+        );
     }
 }
 
@@ -49,14 +65,16 @@ SimulationResult ScenarioRunner::run() {
     }
 
     std::uint64_t nowMs = 0;
+    std::size_t rejectedNetworkSubmissions = 0;
+
     ue.startAttach(nowMs);
-    submitOutgoing(network, ue.flushOutgoing(), nowMs);
+    rejectedNetworkSubmissions += submitOutgoing(network, ue.flushOutgoing(), nowMs);
     deliverReady(network, ue, accessNode, nowMs);
 
     const std::uint64_t attachDeadlineMs = config_.attachPhaseBudgetMs;
 
     while (!ue.isAttached()) {
-        if (config_.stepMs > attachDeadlineMs - nowMs) {
+        if (nowMs >= attachDeadlineMs || config_.stepMs > attachDeadlineMs - nowMs) {
             break;
         }
 
@@ -64,10 +82,11 @@ SimulationResult ScenarioRunner::run() {
 
         ue.tick(nowMs);
         accessNode.tick(nowMs);
-        submitOutgoing(network, ue.flushOutgoing(), nowMs);
-        submitOutgoing(network, accessNode.flushOutgoing(), nowMs);
+        rejectedNetworkSubmissions += submitOutgoing(network, ue.flushOutgoing(), nowMs);
+        rejectedNetworkSubmissions += submitOutgoing(network, accessNode.flushOutgoing(), nowMs);
         deliverReady(network, ue, accessNode, nowMs);
     }
+
     result.attachSucceeded = ue.isAttached();
     if (!result.attachSucceeded) {
         result.notes.push_back("Attach phase ended without reaching Attached state.");
@@ -79,38 +98,45 @@ SimulationResult ScenarioRunner::run() {
         result.packetsDeliveredByNetwork = network.metrics().packetsDelivered;
         result.activeSessionsAtEnd = accessNode.coreNetwork().activeSessionCount();
         result.expiredSessions = accessNode.coreNetwork().expiredSessions();
+
+        addRejectedNetworkSubmissionsNote(result, rejectedNetworkSubmissions);
+
         return result;
     }
 
     const std::uint64_t trafficStartMs = nowMs;
     std::size_t eventIndex = 0;
+
     while (nowMs < trafficStartMs + config_.trafficProfile.durationMs) {
-        while (eventIndex < trafficEvents.size() && trafficStartMs + trafficEvents[eventIndex].timestampMs <= nowMs) {
+        while (eventIndex < trafficEvents.size() &&
+               trafficStartMs + trafficEvents[eventIndex].timestampMs <= nowMs) {
             if (ue.isAttached()) {
                 result.trafficStarted = true;
             }
+
             ue.sendTraffic(trafficEvents[eventIndex].payload, nowMs);
             ++eventIndex;
         }
 
         nowMs += config_.stepMs;
+
         ue.tick(nowMs);
         accessNode.tick(nowMs);
-        submitOutgoing(network, ue.flushOutgoing(), nowMs);
-        submitOutgoing(network, accessNode.flushOutgoing(), nowMs);
+        rejectedNetworkSubmissions += submitOutgoing(network, ue.flushOutgoing(), nowMs);
+        rejectedNetworkSubmissions += submitOutgoing(network, accessNode.flushOutgoing(), nowMs);
         deliverReady(network, ue, accessNode, nowMs);
     }
 
     ue.startDetach(nowMs);
-    submitOutgoing(network, ue.flushOutgoing(), nowMs);
+    rejectedNetworkSubmissions += submitOutgoing(network, ue.flushOutgoing(), nowMs);
     deliverReady(network, ue, accessNode, nowMs);
 
     const std::uint64_t detachDeadlineMs = nowMs + config_.detachPhaseBudgetMs;
 
     while (ue.isAttached() ||
-        ue.state() == SessionState::Detaching ||
-        accessNode.coreNetwork().activeSessionCount() > 0) {
-        if (config_.stepMs > detachDeadlineMs - nowMs) {
+           ue.state() == SessionState::Detaching ||
+           accessNode.coreNetwork().activeSessionCount() > 0) {
+        if (nowMs >= detachDeadlineMs || config_.stepMs > detachDeadlineMs - nowMs) {
             break;
         }
 
@@ -118,8 +144,8 @@ SimulationResult ScenarioRunner::run() {
 
         ue.tick(nowMs);
         accessNode.tick(nowMs);
-        submitOutgoing(network, ue.flushOutgoing(), nowMs);
-        submitOutgoing(network, accessNode.flushOutgoing(), nowMs);
+        rejectedNetworkSubmissions += submitOutgoing(network, ue.flushOutgoing(), nowMs);
+        rejectedNetworkSubmissions += submitOutgoing(network, accessNode.flushOutgoing(), nowMs);
         deliverReady(network, ue, accessNode, nowMs);
     }
 
@@ -153,12 +179,15 @@ SimulationResult ScenarioRunner::run() {
     result.packetsDroppedInNetwork = network.metrics().packetsDropped;
     result.packetsDeliveredByNetwork = network.metrics().packetsDelivered;
     result.activeSessionsAtEnd = accessNode.coreNetwork().activeSessionCount();
+    result.expiredSessions = accessNode.coreNetwork().expiredSessions();
+
     result.throughputMbps = (config_.trafficProfile.durationMs == 0)
                                 ? 0.0
                                 : (static_cast<double>(result.bytesDeliveredToCore) * 8.0) /
-                                      (static_cast<double>(config_.trafficProfile.durationMs) / 1000.0) / 1'000'000.0;
+                                      (static_cast<double>(config_.trafficProfile.durationMs) / 1000.0) /
+                                      1'000'000.0;
 
-    result.expiredSessions = accessNode.coreNetwork().expiredSessions();
+    addRejectedNetworkSubmissionsNote(result, rejectedNetworkSubmissions);
 
     if (result.expiredSessions > 0) {
         result.notes.push_back("At least one CoreNetwork session expired unexpectedly.");
