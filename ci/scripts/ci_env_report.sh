@@ -36,10 +36,83 @@ check_tool() {
     missing=1
   fi
 }
+version_at_least() {
+  local actual="$1"
+  local required="$2"
+
+  local actual_major actual_minor actual_patch
+  local required_major required_minor required_patch
+
+  IFS='.' read -r actual_major actual_minor actual_patch <<< "$actual"
+  IFS='.' read -r required_major required_minor required_patch <<< "$required"
+
+  actual_major="${actual_major:-0}"
+  actual_minor="${actual_minor:-0}"
+  actual_patch="${actual_patch:-0}"
+
+  required_major="${required_major:-0}"
+  required_minor="${required_minor:-0}"
+  required_patch="${required_patch:-0}"
+
+  if (( actual_major > required_major )); then
+    return 0
+  fi
+
+  if (( actual_major < required_major )); then
+    return 1
+  fi
+
+  if (( actual_minor > required_minor )); then
+    return 0
+  fi
+
+  if (( actual_minor < required_minor )); then
+    return 1
+  fi
+
+  (( actual_patch >= required_patch ))
+}
+
+tool_version() {
+  local tool="$1"
+
+  "$tool" --version | head -n 1 | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n 1
+}
+
+check_tool_min_version() {
+  local tool="$1"
+  local required="$2"
+
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "[CI] ERROR: required tool not found: $tool" | tee -a "$LOG"
+    missing=1
+    return
+  fi
+
+  local actual
+  actual="$(tool_version "$tool")"
+
+  if [[ -z "$actual" ]]; then
+    echo "[CI] ERROR: cannot detect $tool version" | tee -a "$LOG"
+    missing=1
+    return
+  fi
+
+  {
+    echo ""
+    echo "[$tool]"
+    "$tool" --version
+  } | tee -a "$LOG"
+
+  if ! version_at_least "$actual" "$required"; then
+    echo "[CI] ERROR: $tool version $actual is too old. Required: $required or newer." | tee -a "$LOG"
+    missing=1
+  fi
+}
 
 check_tool git
-check_tool cmake
-check_tool ctest
+check_tool_min_version cmake 3.21.0
+check_tool_min_version ctest 3.21.0
 
 if command -v c++ >/dev/null 2>&1; then
   {
