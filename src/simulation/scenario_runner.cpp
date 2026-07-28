@@ -53,8 +53,15 @@ SimulationResult ScenarioRunner::run() {
     submitOutgoing(network, ue.flushOutgoing(), nowMs);
     deliverReady(network, ue, accessNode, nowMs);
 
-    while (nowMs <= config_.attachPhaseBudgetMs && !ue.isAttached()) {
+    const std::uint64_t attachDeadlineMs = config_.attachPhaseBudgetMs;
+
+    while (!ue.isAttached()) {
+        if (config_.stepMs > attachDeadlineMs - nowMs) {
+            break;
+        }
+
         nowMs += config_.stepMs;
+
         ue.tick(nowMs);
         accessNode.tick(nowMs);
         submitOutgoing(network, ue.flushOutgoing(), nowMs);
@@ -99,9 +106,16 @@ SimulationResult ScenarioRunner::run() {
     deliverReady(network, ue, accessNode, nowMs);
 
     const std::uint64_t detachDeadlineMs = nowMs + config_.detachPhaseBudgetMs;
-    while (nowMs <= detachDeadlineMs &&
-           (ue.isAttached() || ue.state() == SessionState::Detaching || accessNode.coreNetwork().activeSessionCount() > 0)) {
+
+    while (ue.isAttached() ||
+        ue.state() == SessionState::Detaching ||
+        accessNode.coreNetwork().activeSessionCount() > 0) {
+        if (config_.stepMs > detachDeadlineMs - nowMs) {
+            break;
+        }
+
         nowMs += config_.stepMs;
+
         ue.tick(nowMs);
         accessNode.tick(nowMs);
         submitOutgoing(network, ue.flushOutgoing(), nowMs);
