@@ -14,6 +14,7 @@ pipeline {
         CI_LOG_DIR = 'ci_out/logs'
         CI_REPORT_DIR = 'ci_out/reports'
         CI_ARTIFACT_DIR = 'ci_out/artifacts'
+        CI_EXPECT_TEST_REPORTS = 'false'
     }
 
     stages {
@@ -41,6 +42,9 @@ pipeline {
 
         stage('03 Unit tests') {
             steps {
+                script {
+                    env.CI_EXPECT_TEST_REPORTS = 'true'
+                }
                 sh 'bash ci/scripts/ci_test_unit.sh'
             }
         }
@@ -67,7 +71,22 @@ pipeline {
     post {
         always {
             sh 'bash ci/scripts/ci_collect_logs.sh'
-            junit testResults: 'ci_out/reports/**/*.xml', allowEmptyResults: false
+
+            script {
+                def hasJUnitReports = sh(
+                    script: 'test -n "$(find ci_out/reports -name "*.xml" -print -quit 2>/dev/null)"',
+                    returnStatus: true
+                ) == 0
+
+                if (hasJUnitReports) {
+                    junit testResults: 'ci_out/reports/**/*.xml', allowEmptyResults: false
+                } else if (env.CI_EXPECT_TEST_REPORTS == 'true') {
+                    error 'Test stages started, but no JUnit reports were produced.'
+                } else {
+                    echo 'No JUnit reports found. Test stages did not start, so preserving the original Preflight/Build failure.'
+                }
+            }
+            
             archiveArtifacts artifacts: 'ci_out/**/*', fingerprint: true, allowEmptyArchive: true
         }
         success {
