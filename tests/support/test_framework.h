@@ -229,5 +229,38 @@ struct TestRegistrar {
 #define ASSERT_TRUE(expression) ::miniran::test::assertTrue((expression), #expression, __FILE__, __LINE__)
 #define ASSERT_EQ(left, right) ::miniran::test::assertEqual((left), (right), #left, #right, __FILE__, __LINE__)
 #define ASSERT_NE(left, right) ::miniran::test::assertNotEqual((left), (right), #left, #right, __FILE__, __LINE__)
-#define ASSERT_NEAR(left, right, tolerance) \
-    ::miniran::test::assertNear((left), (right), (tolerance), #left, #right, #tolerance, __FILE__, __LINE__)
+#define ASSERT_NEAR(left, right, tolerance)                                    \
+    do {                                                                      \
+        const auto actualLeft = static_cast<double>(left);                     \
+        const auto actualRight = static_cast<double>(right);                   \
+        const auto actualTolerance = static_cast<double>(tolerance);           \
+                                                                              \
+        if (!std::isfinite(actualLeft) ||                                      \
+            !std::isfinite(actualRight) ||                                     \
+            !std::isfinite(actualTolerance) ||                                 \
+            actualTolerance < 0.0) {                                           \
+            std::ostringstream oss;                                            \
+            oss << "ASSERT_NEAR(" #left ", " #right ", " #tolerance          \
+                ") failed: non-finite value or negative tolerance. "           \
+                << "left=" << actualLeft                                       \
+                << ", right=" << actualRight                                   \
+                << ", tolerance=" << actualTolerance;                          \
+            throw ::miniran::test::AssertionFailure(                           \
+                __FILE__,                                                      \
+                __LINE__,                                                      \
+                oss.str());                                                    \
+        }                                                                     \
+                                                                              \
+        if (std::fabs(actualLeft - actualRight) > actualTolerance) {           \
+            std::ostringstream oss;                                            \
+            oss << "ASSERT_NEAR(" #left ", " #right ", " #tolerance          \
+                ") failed: "                                                  \
+                << "left=" << actualLeft                                       \
+                << ", right=" << actualRight                                   \
+                << ", tolerance=" << actualTolerance;                          \
+            throw ::miniran::test::AssertionFailure(                           \
+                __FILE__,                                                      \
+                __LINE__,                                                      \
+                oss.str());                                                    \
+        }                                                                     \
+    } while (false)
