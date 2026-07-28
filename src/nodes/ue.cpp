@@ -178,6 +178,13 @@ void Ue::tick(std::uint64_t nowMs) {
 
 void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
 
+    if (datagram.toNodeId != nodeId_) {
+        return;
+    }
+
+    if (datagram.fromNodeId != accessNodeId_) {
+        return;
+    }
     // Decode incoming bytes.
     std::string error;
     std::optional<ProtocolMessage> protocolMessage_opt = FrameCodec::decode(datagram.bytes, error);

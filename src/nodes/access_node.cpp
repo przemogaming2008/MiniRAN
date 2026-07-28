@@ -29,73 +29,88 @@ void AccessNode::tick(std::uint64_t nowMs) {
 
 void AccessNode::onDatagram(const Datagram& datagram, std::uint64_t nowMs) {
 
-    //Decode datagram bytes using FrameCodec.
-    std::string error;
-    std::optional<ProtocolMessage> decode_opt = FrameCodec::decode(datagram.bytes,error);
-
-    if(decode_opt){
-        ProtocolMessage protocolMessage = *decode_opt;
-        //Route messages by type:
-        //    - AttachRequest  -> coreNetwork_.handleAttachRequest()
-        //    - Heartbeat      -> coreNetwork_.handleHeartbeat()
-        //    - Data           -> coreNetwork_.handleData()
-        //    - DetachRequest  -> coreNetwork_.handleDetachRequest()
-        if(protocolMessage.header.messageType == MessageType::AttachRequest){
-            //Update AccessNode metrics when appropriate.
-            metrics_.packetsDelivered += 1;
-            metrics_.bytesDelivered += datagram.bytes.size();
-            std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleAttachRequest(protocolMessage,nowMs);
-            if (msg_opt) {
-                queueResponseToUe(*msg_opt, nowMs);
-            }
-            return;
-        }else if(protocolMessage.header.messageType == MessageType::Heartbeat){
-            metrics_.packetsDelivered += 1;
-            metrics_.bytesDelivered += datagram.bytes.size();
-            std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleHeartbeat(protocolMessage,nowMs);
-            if (msg_opt) {
-                queueResponseToUe(*msg_opt, nowMs); 
-            }
-            return;
-        }else if(protocolMessage.header.messageType == MessageType::Data){
-            metrics_.packetsDelivered += 1;
-            metrics_.bytesDelivered += datagram.bytes.size();
-            coreNetwork_.handleData(protocolMessage,nowMs);
-            return;
-
-        }else if(protocolMessage.header.messageType == MessageType::DetachRequest){
-            metrics_.packetsDelivered += 1;
-            metrics_.bytesDelivered += datagram.bytes.size();
-            std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleDetachRequest(protocolMessage,nowMs);
-            if (msg_opt) {
-                queueResponseToUe(*msg_opt, nowMs);
-            }
-            return;
-        }else{
-            metrics_.packetsDropped += 1;
-            //inappropriate header
-            //Unsupported message type: send Error response
-            ProtocolMessage msg = ProtocolMessage{};
-            msg.header.messageType = MessageType::Error;
-            msg.header.ueId = protocolMessage.header.ueId;
-            msg.header.sessionId = protocolMessage.header.sessionId;
-            msg.header.sequenceNumber = protocolMessage.header.sequenceNumber;
-            msg.header.timestampMs = nowMs;
-
-            queueResponseToUe(msg, nowMs);
-            return;
-
-        }
-        
-        
-
-    } else {
+    if (datagram.toNodeId != nodeId_) {
         metrics_.packetsDropped += 1;
-        //Malformed frames are dropped silently because no valid header exists to build a protocol-level Error response.
         return;
     }
-    
-    return;
+
+    if (datagram.fromNodeId != ueNodeId_) {
+        metrics_.packetsDropped += 1;
+        return;
+    }
+
+    std::string error;
+    std::optional<ProtocolMessage> decode_opt = FrameCodec::decode(datagram.bytes, error);
+
+    if (!decode_opt) {
+        metrics_.packetsDropped += 1;
+
+        return;
+    }
+
+    ProtocolMessage protocolMessage = *decode_opt;
+
+    if (protocolMessage.header.ueId != datagram.fromNodeId) {
+        metrics_.packetsDropped += 1;
+        return;
+    }
+
+    if (protocolMessage.header.ueId != ueNodeId_) {
+        metrics_.packetsDropped += 1;
+        return;
+    }
+
+    if (protocolMessage.header.messageType == MessageType::AttachRequest) {
+        metrics_.packetsDelivered += 1;
+        metrics_.bytesDelivered += datagram.bytes.size();
+
+        std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleAttachRequest(protocolMessage, nowMs);
+        if (msg_opt) {
+            queueResponseToUe(*msg_opt, nowMs);
+        }
+        return;
+    }
+
+    if (protocolMessage.header.messageType == MessageType::Heartbeat) {
+        metrics_.packetsDelivered += 1;
+        metrics_.bytesDelivered += datagram.bytes.size();
+
+        std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleHeartbeat(protocolMessage, nowMs);
+        if (msg_opt) {
+            queueResponseToUe(*msg_opt, nowMs);
+        }
+        return;
+    }
+
+    if (protocolMessage.header.messageType == MessageType::Data) {
+        metrics_.packetsDelivered += 1;
+        metrics_.bytesDelivered += datagram.bytes.size();
+
+        coreNetwork_.handleData(protocolMessage, nowMs);
+        return;
+    }
+
+    if (protocolMessage.header.messageType == MessageType::DetachRequest) {
+        metrics_.packetsDelivered += 1;
+        metrics_.bytesDelivered += datagram.bytes.size();
+
+        std::optional<ProtocolMessage> msg_opt = coreNetwork_.handleDetachRequest(protocolMessage, nowMs);
+        if (msg_opt) {
+            queueResponseToUe(*msg_opt, nowMs);
+        }
+        return;
+    }
+
+    metrics_.packetsDropped += 1;
+
+    ProtocolMessage msg = ProtocolMessage{};
+    msg.header.messageType = MessageType::Error;
+    msg.header.ueId = protocolMessage.header.ueId;
+    msg.header.sessionId = protocolMessage.header.sessionId;
+    msg.header.sequenceNumber = protocolMessage.header.sequenceNumber;
+    msg.header.timestampMs = nowMs;
+
+    queueResponseToUe(msg, nowMs);
 }
 
 std::vector<Datagram> AccessNode::flushOutgoing() {
