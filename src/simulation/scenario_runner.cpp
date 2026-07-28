@@ -52,7 +52,7 @@ SimulationResult ScenarioRunner::run() {
     SimulationResult result;
     result.scenarioName = config_.scenarioName;
 
-    Ue ue(config_.ueId, config_.accessNodeId, config_.transportMode, config_.timers);
+    Ue ue(config_.ueId, config_.accessNodeId,config_.timers);
     AccessNode accessNode(config_.accessNodeId, config_.ueId, CoreNetwork(config_.timers));
     VirtualNetwork network(config_.linkProfile, 1337);
 
