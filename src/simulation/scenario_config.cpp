@@ -68,6 +68,41 @@ const std::unordered_set<std::string>& knownConfigKeys() {
     return keys;
 }
 
+std::uint64_t estimateMaxTrafficEvents(const TrafficProfile& profile) {
+    if (profile.durationMs == 0) {
+        return 0;
+    }
+
+    switch (profile.pattern) {
+        case TrafficPattern::ConstantBitrate:
+            return (profile.durationMs * static_cast<std::uint64_t>(profile.packetsPerSecond) + 999ull) / 1000ull;
+
+        case TrafficPattern::Bursty: {
+            if (profile.burstIntervalMs == 0) {
+                return std::numeric_limits<std::uint64_t>::max();
+            }
+
+            const std::uint64_t bursts =
+                (profile.durationMs + static_cast<std::uint64_t>(profile.burstIntervalMs) - 1ull) /
+                static_cast<std::uint64_t>(profile.burstIntervalMs);
+
+            if (bursts > std::numeric_limits<std::uint64_t>::max() /
+                             static_cast<std::uint64_t>(profile.burstPackets)) {
+                return std::numeric_limits<std::uint64_t>::max();
+            }
+
+            return bursts * static_cast<std::uint64_t>(profile.burstPackets);
+        }
+
+        case TrafficPattern::Ramp: {
+            const std::uint32_t maxPps = std::max(profile.rampStartPps, profile.rampEndPps);
+            return (profile.durationMs * static_cast<std::uint64_t>(maxPps) + 999ull) / 1000ull;
+        }
+    }
+
+    return std::numeric_limits<std::uint64_t>::max();
+}
+
 bool parseUInt64Strict(const std::string& text, std::uint64_t& out) {
     if (text.empty()) {
         return false;
@@ -388,6 +423,50 @@ std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, 
         return std::nullopt;
     }
 
+    constexpr std::uint32_t maxReasonablePps = 100'000u;
+    constexpr std::uint32_t maxReasonableBurstPackets = 100'000u;
+    constexpr std::uint64_t maxGeneratedTrafficEvents = 1'000'000ull;
+
+    if (config.timers.heartbeatIntervalMs >= config.timers.inactivityTimeoutMs) {
+        error = "heartbeat_interval_ms must be smaller than inactivity_timeout_ms.";
+        return std::nullopt;
+    }
+
+    if (config.timers.attachTimeoutMs > config.attachPhaseBudgetMs) {
+        error = "attach_timeout_ms must not be greater than attach_phase_budget_ms.";
+        return std::nullopt;
+    }
+
+    if (config.timers.detachTimeoutMs > config.detachPhaseBudgetMs) {
+        error = "detach_timeout_ms must not be greater than detach_phase_budget_ms.";
+        return std::nullopt;
+    }
+
+    if (config.trafficProfile.packetsPerSecond > maxReasonablePps) {
+        error = "packets_per_second is unreasonably large.";
+        return std::nullopt;
+    }
+
+    if (config.trafficProfile.rampStartPps > maxReasonablePps) {
+        error = "ramp_start_pps is unreasonably large.";
+        return std::nullopt;
+    }
+
+    if (config.trafficProfile.rampEndPps > maxReasonablePps) {
+        error = "ramp_end_pps is unreasonably large.";
+        return std::nullopt;
+    }
+
+    if (config.trafficProfile.burstPackets > maxReasonableBurstPackets) {
+        error = "burst_packets is unreasonably large.";
+        return std::nullopt;
+    }
+
+    if (estimateMaxTrafficEvents(config.trafficProfile) > maxGeneratedTrafficEvents) {
+        error = "traffic profile would generate too many events.";
+        return std::nullopt;
+    }
+    
     if (!config.linkProfile.isValid()) {
         error = "Invalid LinkProfile values.";
         return std::nullopt;
