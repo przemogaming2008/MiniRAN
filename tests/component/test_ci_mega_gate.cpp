@@ -5,10 +5,12 @@
 using namespace miniran;
 
 namespace {
+
 SimulationResult runScenarioFile(const std::string& path) {
     std::string error;
     auto config = ScenarioConfig::fromFile(path, error);
     ASSERT_TRUE(config.has_value());
+
     ScenarioRunner runner(*config);
     return runner.run();
 }
@@ -21,7 +23,16 @@ void assertScenarioHealthy(const SimulationResult& result) {
     ASSERT_TRUE(result.bytesGenerated > 0);
     ASSERT_TRUE(result.bytesDeliveredToCore > 0);
 }
+
+double offeredThroughputMbps(const SimulationResult& result, std::uint64_t durationMs) {
+    return (durationMs == 0)
+               ? 0.0
+               : (static_cast<double>(result.bytesGenerated) * 8.0) /
+                     (static_cast<double>(durationMs) / 1000.0) /
+                     1'000'000.0;
 }
+
+}  // namespace
 
 TEST_CASE(component_ci_tcp_heavy_scenario_is_stable) {
     const auto result = runScenarioFile("scenarios/ci_tcp_heavy.cfg");
@@ -38,7 +49,13 @@ TEST_CASE(component_ci_udp_loss_15_still_finishes_session) {
 TEST_CASE(component_ci_low_bandwidth_limits_throughput_but_not_session) {
     const auto result = runScenarioFile("scenarios/ci_low_bandwidth.cfg");
     assertScenarioHealthy(result);
-    ASSERT_TRUE(result.throughputMbps < 1.0);
+
+    const double offeredMbps = offeredThroughputMbps(result, 1800);
+    const double linkLimitMbps = 0.256;
+
+    ASSERT_TRUE(offeredMbps > linkLimitMbps);
+    ASSERT_TRUE(result.packetsDroppedInNetwork > 0);
+    ASSERT_TRUE(result.throughputMbps < offeredMbps);
 }
 
 TEST_CASE(component_ci_repeated_tcp_runs_are_deterministic) {
