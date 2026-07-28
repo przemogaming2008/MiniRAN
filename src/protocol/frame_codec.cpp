@@ -9,6 +9,24 @@ namespace miniran {
 namespace {
 constexpr std::uint8_t kProtocolVersion = 1;
 constexpr std::uint8_t kHeaderLength = 28;
+
+bool isKnownMessageType(std::uint8_t rawType)
+{
+    switch (static_cast<MessageType>(rawType)) {
+    case MessageType::AttachRequest:
+    case MessageType::AttachAccept:
+    case MessageType::AttachReject:
+    case MessageType::DetachRequest:
+    case MessageType::DetachAccept:
+    case MessageType::Heartbeat:
+    case MessageType::HeartbeatAck:
+    case MessageType::Data:
+    case MessageType::Error:
+        return true;
+    }
+
+    return false;
+}
 }  // namespace
 
 std::string toString(MessageType type) {
@@ -88,29 +106,48 @@ std::vector<std::uint8_t> FrameCodec::encode(const ProtocolMessage& message) {
     return writer.bytes();
 }
 
-std::optional<ProtocolMessage> FrameCodec::decode(const std::vector<std::uint8_t>& bytes, std::string& error) {
+std::optional<ProtocolMessage>
+FrameCodec::decode(const std::vector<std::uint8_t>& bytes,
+                   std::string& error)
+{
     ByteBufferReader reader(bytes);
-    ProtocolMessage message;
+    ProtocolMessage message{};
     std::uint8_t messageType = 0;
 
-    if (!reader.readU8(message.header.version) || !reader.readU8(messageType) || !reader.readU8(message.header.flags) ||
-        !reader.readU8(message.header.headerLength) || !reader.readU32(message.header.sessionId) ||
-        !reader.readU32(message.header.ueId) || !reader.readU32(message.header.sequenceNumber) ||
-        !reader.readU64(message.header.timestampMs) || !reader.readU32(message.header.payloadLength)) {
+    if (!reader.readU8(message.header.version) ||
+        !reader.readU8(messageType) ||
+        !reader.readU8(message.header.flags) ||
+        !reader.readU8(message.header.headerLength) ||
+        !reader.readU32(message.header.sessionId) ||
+        !reader.readU32(message.header.ueId) ||
+        !reader.readU32(message.header.sequenceNumber) ||
+        !reader.readU64(message.header.timestampMs) ||
+        !reader.readU32(message.header.payloadLength))
+    {
         error = "Frame is shorter than the mandatory header.";
         return std::nullopt;
     }
 
     if (message.header.version != kProtocolVersion) {
         std::ostringstream stream;
-        stream << "Unsupported protocol version: " << static_cast<int>(message.header.version);
+        stream << "Unsupported protocol version: "
+               << static_cast<int>(message.header.version);
+        error = stream.str();
+        return std::nullopt;
+    }
+
+    if (!isKnownMessageType(messageType)) {
+        std::ostringstream stream;
+        stream << "Invalid message type: "
+               << static_cast<int>(messageType);
         error = stream.str();
         return std::nullopt;
     }
 
     if (message.header.headerLength != kHeaderLength) {
         std::ostringstream stream;
-        stream << "Unsupported header length: " << static_cast<int>(message.header.headerLength);
+        stream << "Unsupported header length: "
+               << static_cast<int>(message.header.headerLength);
         error = stream.str();
         return std::nullopt;
     }

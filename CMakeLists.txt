@@ -58,6 +58,7 @@ if(MINIRAN_BUILD_TESTS)
         tests/unit/test_attach_validate.cpp
         tests/unit/test_config_invalid_numeric_value.cpp
         tests/unit/test_data_with_zero_length_payload.cpp
+        tests/unit/test_frame_codec_invalid_message_type.cpp
     )
 
     set(MINIRAN_COMPONENT_TEST_SOURCES
