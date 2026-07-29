@@ -5,6 +5,23 @@
 
 namespace miniran {
 
+namespace
+{
+
+const char* transportModeName(TransportMode mode)
+{
+    switch (mode) {
+    case TransportMode::Tcp:
+        return "Tcp";
+    case TransportMode::Udp:
+        return "Udp";
+    }
+
+    return "Unknown";
+}
+
+}  // namespace
+
 bool SimulationResult::isHealthy() const {
     if (!attachSucceeded) {
         return false;
@@ -30,6 +47,12 @@ bool SimulationResult::isHealthy() const {
         return false;
     }
 
+    if (transportMode == TransportMode::Tcp &&
+        rejectedNetworkSubmissions != 0)
+    {
+        return false;
+    }
+
     if (bytesGenerated > 0 && bytesDeliveredToCore == 0) {
         return false;
     }
@@ -44,6 +67,7 @@ bool SimulationResult::isHealthy() const {
 std::string SimulationResult::summary() const {
     std::ostringstream output;
     output << "Scenario: " << scenarioName << '\n';
+    output << "Transport mode: " << transportModeName(transportMode) << '\n';
     output << "Duration [ms]: " << totalDurationMs << '\n';
     output << "Attach succeeded: " << (attachSucceeded ? "yes" : "no") << '\n';
     output << "Traffic started: " << (trafficStarted ? "yes" : "no") << '\n';
@@ -55,6 +79,7 @@ std::string SimulationResult::summary() const {
     output << "Packets delivered to core: " << packetsDeliveredToCore << '\n';
     output << "Bytes delivered to core: " << bytesDeliveredToCore << '\n';
     output << "Packets dropped in network: " << packetsDroppedInNetwork << '\n';
+    output << "Rejected network submissions: " << rejectedNetworkSubmissions << '\n';
     output << "Packets delivered by network: " << packetsDeliveredByNetwork << '\n';
     output << "Active sessions at end: " << activeSessionsAtEnd << '\n';
     output << "Expired sessions: " << expiredSessions << '\n';

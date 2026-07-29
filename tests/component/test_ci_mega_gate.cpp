@@ -22,6 +22,11 @@ void assertScenarioHealthy(const SimulationResult& result) {
     ASSERT_EQ(result.activeSessionsAtEnd, static_cast<std::size_t>(0));
     ASSERT_TRUE(result.bytesGenerated > 0);
     ASSERT_TRUE(result.bytesDeliveredToCore > 0);
+    ASSERT_TRUE(result.isHealthy());
+
+    if (result.transportMode == TransportMode::Tcp) {
+        ASSERT_EQ(result.rejectedNetworkSubmissions, static_cast<std::size_t>(0));
+    }
 }
 
 void assertSameScenarioResult(const SimulationResult& expected, const SimulationResult& actual) {
@@ -44,6 +49,9 @@ void assertSameScenarioResult(const SimulationResult& expected, const Simulation
     ASSERT_EQ(actual.expiredSessions, expected.expiredSessions);
 
     ASSERT_EQ(actual.totalDurationMs, expected.totalDurationMs);
+
+    ASSERT_TRUE(actual.transportMode == expected.transportMode);
+    ASSERT_EQ(actual.rejectedNetworkSubmissions, expected.rejectedNetworkSubmissions);
 }
 
 double offeredThroughputMbps(const SimulationResult& result, std::uint64_t durationMs) {
@@ -89,4 +97,39 @@ TEST_CASE(component_ci_repeated_tcp_runs_are_deterministic) {
         assertScenarioHealthy(result);
         assertSameScenarioResult(reference, result);
     }
+}
+
+TEST_CASE(component_tcp_rejected_network_submissions_are_unhealthy) {
+    ScenarioConfig config;
+    config.scenarioName = "tcp_queue_overflow_is_unhealthy";
+    config.transportMode = TransportMode::Tcp;
+    config.stepMs = 10;
+    config.attachPhaseBudgetMs = 1600;
+    config.detachPhaseBudgetMs = 1600;
+
+    config.linkProfile.mode = TransportMode::Tcp;
+    config.linkProfile.latencyMs = 20;
+    config.linkProfile.jitterMs = 0;
+    config.linkProfile.lossPercent = 0.0;
+    config.linkProfile.reorderPercent = 0.0;
+    config.linkProfile.bandwidthKbps = 16;
+    config.linkProfile.queueLimitPackets = 4;
+
+    config.timers.attachTimeoutMs = 150;
+    config.timers.detachTimeoutMs = 150;
+    config.timers.heartbeatIntervalMs = 200;
+    config.timers.inactivityTimeoutMs = 6000;
+    config.timers.maxAttachRetries = 4;
+    config.timers.maxDetachRetries = 4;
+
+    config.trafficProfile.pattern = TrafficPattern::ConstantBitrate;
+    config.trafficProfile.durationMs = 1000;
+    config.trafficProfile.packetSizeBytes = 512;
+    config.trafficProfile.packetsPerSecond = 200;
+
+    ScenarioRunner runner(config);
+    const auto result = runner.run();
+
+    ASSERT_TRUE(result.rejectedNetworkSubmissions > 0);
+    ASSERT_TRUE(!result.isHealthy());
 }

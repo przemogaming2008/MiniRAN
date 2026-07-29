@@ -51,6 +51,7 @@ ScenarioRunner::ScenarioRunner(ScenarioConfig config) : config_(std::move(config
 SimulationResult ScenarioRunner::run() {
     SimulationResult result;
     result.scenarioName = config_.scenarioName;
+    result.transportMode = config_.linkProfile.mode;
 
     Ue ue(config_.ueId, config_.accessNodeId,config_.timers);
     AccessNode accessNode(config_.accessNodeId, config_.ueId, CoreNetwork(config_.timers));
@@ -98,7 +99,7 @@ SimulationResult ScenarioRunner::run() {
         result.packetsDeliveredByNetwork = network.metrics().packetsDelivered;
         result.activeSessionsAtEnd = accessNode.coreNetwork().activeSessionCount();
         result.expiredSessions = accessNode.coreNetwork().expiredSessions();
-
+        result.rejectedNetworkSubmissions = rejectedNetworkSubmissions;
         addRejectedNetworkSubmissionsNote(result, rejectedNetworkSubmissions);
 
         return result;
@@ -180,6 +181,7 @@ SimulationResult ScenarioRunner::run() {
     result.packetsDeliveredByNetwork = network.metrics().packetsDelivered;
     result.activeSessionsAtEnd = accessNode.coreNetwork().activeSessionCount();
     result.expiredSessions = accessNode.coreNetwork().expiredSessions();
+    result.rejectedNetworkSubmissions = rejectedNetworkSubmissions;
 
     result.throughputMbps = (config_.trafficProfile.durationMs == 0)
                                 ? 0.0
@@ -213,6 +215,12 @@ SimulationResult ScenarioRunner::run() {
         result.notes.push_back("Scenario result is unhealthy.");
     }
 
+    if (config_.linkProfile.mode == TransportMode::Tcp &&
+        result.rejectedNetworkSubmissions > 0)
+    {
+        result.notes.push_back("TCP-like scenario had rejected network submissions.");
+    }
+    
     return result;
 }
 
