@@ -1,4 +1,5 @@
 #include <vector>
+#include <cstdint>
 
 #include "miniran/transport/virtual_network.h"
 #include "support/test_framework.h"
@@ -48,4 +49,42 @@ TEST_CASE(queue_limit_causes_drop_when_full) {
     ASSERT_TRUE(network.submit(first, 0));
     ASSERT_TRUE(!network.submit(second, 0));
     ASSERT_EQ(network.metrics().packetsDropped, 1U);
+}
+TEST_CASE(tcp_jitter_preserves_submit_order)
+{
+    LinkProfile profile{};
+    profile.mode = TransportMode::Tcp;
+    profile.latencyMs = 20;
+    profile.jitterMs = 100;
+    profile.lossPercent = 0.0;
+    profile.reorderPercent = 0.0;
+    profile.bandwidthKbps = 1'000'000;
+    profile.queueLimitPackets = 64;
+
+    VirtualNetwork network(profile, 123);
+
+    constexpr std::uint8_t packetCount = 20;
+
+    for (std::uint8_t i = 1; i <= packetCount; ++i) {
+        Datagram datagram{};
+        datagram.fromNodeId = 1;
+        datagram.toNodeId = 2;
+        datagram.bytes = {i};
+
+        ASSERT_TRUE(network.submit(datagram, i));
+    }
+
+    const auto ready = network.pollReady(10'000);
+
+    ASSERT_EQ(ready.size(), static_cast<std::size_t>(packetCount));
+
+    for (std::size_t i = 0; i < ready.size(); ++i) {
+        ASSERT_EQ(ready[i].bytes.size(), 1U);
+        ASSERT_EQ(
+            ready[i].bytes[0],
+            static_cast<std::uint8_t>(i + 1U)
+        );
+    }
+
+    ASSERT_EQ(network.metrics().packetsDropped, 0U);
 }

@@ -28,6 +28,9 @@ private:
     std::uniform_real_distribution<double> probability_{0.0, 100.0};
     std::uint64_t nextAvailableTxMs_ = 0;
     std::uint64_t serialCounter_ = 1;
+
+    bool hasLastTcpDeliverAtMs_ = false;
+    std::uint64_t lastTcpDeliverAtMs_ = 0;
 };
 
 }  // namespace miniran
