@@ -53,6 +53,18 @@ bool SimulationResult::isHealthy() const {
         return false;
     }
 
+    if (transportMode == TransportMode::Tcp &&
+        packetsGenerated != packetsDeliveredToCore)
+    {
+        return false;
+    }
+
+    if (transportMode == TransportMode::Tcp &&
+        bytesGenerated != bytesDeliveredToCore)
+    {
+        return false;
+    }
+
     if (bytesGenerated > 0 && bytesDeliveredToCore == 0) {
         return false;
     }

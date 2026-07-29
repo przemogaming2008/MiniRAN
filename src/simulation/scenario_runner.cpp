@@ -220,6 +220,22 @@ SimulationResult ScenarioRunner::run() {
     {
         result.notes.push_back("TCP-like scenario had rejected network submissions.");
     }
+
+    if (config_.linkProfile.mode == TransportMode::Tcp &&
+        result.packetsGenerated != result.packetsDeliveredToCore)
+    {
+        result.notes.push_back(
+            "TCP-like scenario did not deliver all generated packets to CoreNetwork."
+        );
+    }
+
+    if (config_.linkProfile.mode == TransportMode::Tcp &&
+        result.bytesGenerated != result.bytesDeliveredToCore)
+    {
+        result.notes.push_back(
+            "TCP-like scenario did not deliver all generated payload bytes to CoreNetwork."
+        );
+    }
     
     return result;
 }

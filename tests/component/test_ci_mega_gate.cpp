@@ -20,12 +20,16 @@ void assertScenarioHealthy(const SimulationResult& result) {
     ASSERT_TRUE(result.trafficStarted);
     ASSERT_TRUE(result.detachSucceeded);
     ASSERT_EQ(result.activeSessionsAtEnd, static_cast<std::size_t>(0));
+    ASSERT_EQ(result.expiredSessions, static_cast<std::uint64_t>(0));
     ASSERT_TRUE(result.bytesGenerated > 0);
     ASSERT_TRUE(result.bytesDeliveredToCore > 0);
     ASSERT_TRUE(result.isHealthy());
 
     if (result.transportMode == TransportMode::Tcp) {
         ASSERT_EQ(result.rejectedNetworkSubmissions, static_cast<std::size_t>(0));
+        ASSERT_EQ(result.packetsDeliveredToCore, result.packetsGenerated);
+        ASSERT_EQ(result.bytesDeliveredToCore, result.bytesGenerated);
+        ASSERT_EQ(result.packetsDroppedInNetwork, static_cast<std::size_t>(0));
     }
 }
 
