@@ -70,7 +70,18 @@ pipeline {
 
     post {
         always {
-            sh 'bash ci/scripts/ci_collect_logs.sh'
+            script {
+                def collectStatus = sh(
+                    script: 'bash ci/scripts/ci_collect_logs.sh',
+                    returnStatus: true
+                )
+
+                if (collectStatus != 0) {
+                    echo "WARNING: ci_collect_logs.sh failed with exit code ${collectStatus}; continuing with JUnit and artifact publishing."
+                }
+            }
+
+            archiveArtifacts artifacts: 'ci_out/**/*', fingerprint: true, allowEmptyArchive: true
 
             script {
                 def hasJUnitReports = sh(
@@ -79,22 +90,25 @@ pipeline {
                 ) == 0
 
                 if (hasJUnitReports) {
-                    junit testResults: 'ci_out/reports/**/*.xml', allowEmptyResults: false
+                    catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                        junit testResults: 'ci_out/reports/**/*.xml', allowEmptyResults: false
+                    }
                 } else if (env.CI_EXPECT_TEST_REPORTS == 'true') {
                     error 'Test stages started, but no JUnit reports were produced.'
                 } else {
                     echo 'No JUnit reports found. Test stages did not start, so preserving the original Preflight/Build failure.'
                 }
             }
-            
-            archiveArtifacts artifacts: 'ci_out/**/*', fingerprint: true, allowEmptyArchive: true
         }
+
         success {
             echo 'MiniRAN CI: wszystko przeszło poprawnie.'
         }
+
         unstable {
             echo 'MiniRAN CI: testy zwróciły problemy, sprawdź raport JUnit i logi.'
         }
+
         failure {
             echo 'MiniRAN CI: pipeline zatrzymał się na błędzie. Sprawdź pierwszy czerwony stage.'
         }
