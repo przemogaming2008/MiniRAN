@@ -7,6 +7,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(MINIRAN_BUILD_TESTS "Build tests" ON)
 
+option(MINIRAN_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer when supported" OFF)
+
+if(MSVC AND MINIRAN_ENABLE_SANITIZERS)
+    string(REGEX REPLACE "/RTC[1csu]*" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+endif()
+
 add_library(miniran_lib
     src/common/byte_buffer.cpp
     src/common/metrics.cpp
@@ -32,12 +38,40 @@ function(configure_miniran_warnings target_name)
     endif()
 endfunction()
 
+function(configure_miniran_sanitizers target_name)
+    if(NOT MINIRAN_ENABLE_SANITIZERS)
+        return()
+    endif()
+
+    get_target_property(target_type ${target_name} TYPE)
+
+    if(MSVC)
+        target_compile_options(${target_name} PRIVATE /fsanitize=address)
+
+        if(NOT target_type STREQUAL "STATIC_LIBRARY")
+            target_link_options(${target_name} PRIVATE /INCREMENTAL:NO)
+        endif()
+    else()
+        target_compile_options(${target_name} PRIVATE
+            -fsanitize=address,undefined
+            -fno-omit-frame-pointer
+        )
+
+        if(NOT target_type STREQUAL "STATIC_LIBRARY")
+            target_link_options(${target_name} PRIVATE
+                -fsanitize=address,undefined
+            )
+        endif()
+    endif()
+endfunction()
+
 configure_miniran_warnings(miniran_lib)
+configure_miniran_sanitizers(miniran_lib)
 
 add_executable(miniran_cli src/main.cpp)
 target_link_libraries(miniran_cli PRIVATE miniran_lib)
 configure_miniran_warnings(miniran_cli)
-
+configure_miniran_sanitizers(miniran_cli)
 if(MINIRAN_BUILD_TESTS)
     enable_testing()
 
@@ -79,6 +113,7 @@ if(MINIRAN_BUILD_TESTS)
         target_link_libraries(${target_name} PRIVATE miniran_lib)
         target_include_directories(${target_name} PRIVATE tests)
         configure_miniran_warnings(${target_name})
+        configure_miniran_sanitizers(${target_name})
     endfunction()
 
     add_miniran_test_binary(miniran_unit_tests ${MINIRAN_UNIT_TEST_SOURCES})
