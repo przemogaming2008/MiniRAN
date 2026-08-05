@@ -1,155 +1,156 @@
-# MiniRAN ProtoLab
+# MiniRAN CI Factory
 
-MiniRAN ProtoLab is an educational C++17 project template for implementing a **simplified telecom protocol** with three visible phases:
+MiniRAN CI Factory is a small C++17 project that simulates a simplified telecom flow:
 
-1. **Attach UE**
-2. **Generate and transfer traffic**
-3. **Detach UE**
+1. UE attach
+2. user traffic
+3. heartbeat/session supervision
+4. UE detach
+5. CI reports and logs
 
-The project is inspired by the separation of **control plane** and **user plane** known from mobile networks, but it is intentionally much smaller, easier and deterministic enough for unit/component testing.
+The goal of the project is not only working C++ code. The goal is also a reliable CI pipeline that can show clearly what failed and where to look.
 
-## Why this template exists
+## What is implemented
 
-The template already gives the student:
+The project contains:
 
-- a ready CMake project,
-- a message codec,
-- a virtual network with TCP/UDP-like behavior,
-- a traffic generator,
-- a minimal test framework,
-- initial unit tests and component tests,
-- scenario configuration files.
+- C++17 library `miniran_lib`
+- CLI application `miniran_cli`
+- unit tests
+- component tests
+- mega CI gate tests
+- CMake test targets
+- Jenkins pipeline
+- Bash CI scripts
+- JUnit XML reports
+- collected logs and artifacts
 
-The student must still implement the most important telecom logic **ALREADY IMPLEMENTED**:
+## What this project is not
 
-- session state machine,
-- UE behavior,
-- access node behavior,
-- simplified core session handling,
-- attach/detach retry rules,
-- heartbeat stability handling,
-- delivery accounting for data phase.
+MiniRAN is not a real 3GPP implementation.
 
-## Important note
+It does not implement real radio, real TCP/UDP sockets, authentication, encryption, paging, handover or multiple cells.
 
-This is **not** a real 3GPP implementation. There is no real radio stack, NAS, NGAP, GTP-U, authentication, encryption or handover. The project is an **educational protocol laboratory**.
+It is a deterministic educational simulation used for testing protocol logic and CI quality.
 
-AccessNode currently supports a single UE and always sends responses to ueNodeId_. For multi-UE scenarios, responses should be routed based on datagram.fromNodeId instead.
+## Required tools
 
-Malformed frames are dropped silently by AccessNode. No Error response is generated because message metadata may be unavailable after failed decoding.
+Minimum local tools:
 
-AccessNode operates at the transport/frame level,
-while CoreNetwork operates at the protocol/user-data level.
+- CMake 3.21 or newer
+- CTest 3.21 or newer
+- C++17 compiler
+- Bash-compatible shell
+- tar
+- gzip
 
-Throughput is averaged over trafficProfile.durationMs, not actual data delivery time.
+On Windows, Git Bash with MSVC is supported.
 
-VirtualNetwork uses a simplified millisecond-based serialization delay model. Transmission time is estimated from frame size and bandwidth_kbps, so very small frames or high bandwidth values may produce coarse timing effects.
+## Repository layout
 
-Packets are dropped by UDP loss or queue overflow. Loss is applied first. `packetsDropped` aggregates all drop types.
+    include/miniran/      public headers
+    src/                  implementation
+    tests/unit/           unit tests
+    tests/component/      component and mega tests
+    tests/support/        small test framework
+    scenarios/            scenario configuration files
+    ci/scripts/           local and Jenkins CI scripts
+    ci/jenkins/           Jenkins operating notes
+    docs/                 project documentation
+    Jenkinsfile           Jenkins pipeline
+    CMakeLists.txt        CMake build configuration
 
-## Expected initial status
+## Local quick start
 
-After extracting the template and building it:
+Run from repository root:
 
-- infrastructure code should compile,
-- some **unit tests pass immediately**,
-- the tests related to **session handling and end-to-end scenarios are expected to fail** until the student implements the missing logic.
+    bash ci/scripts/ci_env_report.sh
+    bash ci/scripts/ci_build.sh
+    bash ci/scripts/ci_test_unit.sh
+    bash ci/scripts/ci_test_component.sh
+    bash ci/scripts/ci_run_cli_scenarios.sh
+    bash ci/scripts/ci_mega_gate.sh
+    bash ci/scripts/ci_collect_logs.sh
 
-This is intentional.
+Generated output goes to:
 
-## Build
+    ci_out/logs/
+    ci_out/reports/
+    ci_out/artifacts/
 
-```bash
-cmake -S . -B build
-cmake --build build
-ctest --test-dir build --output-on-failure
-```
+## Manual CMake usage
 
-Run the example CLI:
+Clean configure and build:
 
-```bash
-./build/miniran_cli scenarios/tcp_basic.cfg
-```
+    cmake -S . -B build/ci
+    cmake --build build/ci
 
-## Project tree
+Run all CTest tests:
 
-```text
-include/miniran/
-  common/
-  protocol/
-  transport/
-  traffic/
-  core/
-  nodes/
-  simulation/
-src/
-  common/
-  protocol/
-  transport/
-  traffic/
-  core/
-  nodes/
-  simulation/
-tests/
-  unit/
-  component/
-  support/
-scenarios/
-```
+    ctest --test-dir build/ci -C Debug --output-on-failure
 
-## Suggested implementation order
+Run aggregate baseline test target:
 
-1. `SessionManager`
-2. `CoreNetwork`
-3. `AccessNode`
-4. `Ue`
-5. Run tests, debug, extend logging
-6. Improve scenario metrics and add missing tests
+    cmake --build build/ci --target miniran_tests
+    ctest --test-dir build/ci -C Debug -L all --output-on-failure
 
-## Ready files vs TODO files
+Run CLI manually:
 
-### Mostly ready
+    ./build/ci/Debug/miniran_cli.exe scenarios/tcp_basic.cfg
 
-- `frame_codec.*`
-- `virtual_network.*`
-- `traffic_generator.*`
-- `scenario_config.*`
-- test infrastructure
+On single-config generators the executable may be:
 
-### Main student work
+    ./build/ci/miniran_cli scenarios/tcp_basic.cfg
 
-- `session_manager.*`
-- `core_network.*`
-- `access_node.*`
-- `ue.*`
-- making component tests pass
+## Test targets
 
-## Design assumptions
+CMake creates these test binaries:
 
-- one UE in the provided component scenarios,
-- one access node,
-- simplified logical core inside the access side,
-- uplink data path is enough for the first version,
-- TCP mode is reliable and ordered,
-- UDP mode may lose or reorder packets,
-- control-plane reliability for UDP should be handled by the student with timeouts/retries.
+- `miniran_unit_tests`
+- `miniran_component_tests`
+- `miniran_mega_tests`
+- `miniran_tests`
 
-## Commands useful during work
+CTest tests:
 
-```bash
-cmake --build build --target miniran_tests
-./build/miniran_tests
-./build/miniran_cli scenarios/udp_lossy.cfg
-```
+- `unit_tests` with label `unit`
+- `component_tests` with label `component`
+- `mega_gate_tests` with label `mega`
+- `all_tests` with label `all`
 
-## Final deliverable expected from the student
+`miniran_tests` is the simple aggregate baseline binary. It contains unit and component tests. Mega gate stays separate.
 
-A working implementation should:
+## CLI exit codes
 
-- attach a UE,
-- keep the session stable with heartbeat logic,
-- transfer simulated traffic,
-- measure basic throughput and delivery statistics,
-- detach the UE cleanly,
-- pass all provided tests,
-- preferably add extra tests for edge cases.
+`miniran_cli` returns:
+
+- `0` healthy scenario result
+- `1` missing CLI argument
+- `2` invalid scenario configuration
+- `3` scenario ran but result was unhealthy
+
+A TCP-like scenario is healthy only when generated traffic is delivered completely and there are no rejected network submissions.
+
+## Jenkins
+
+The Jenkins pipeline is defined in:
+
+    Jenkinsfile
+
+The pipeline uses:
+
+    agent any
+
+The real environment is checked by:
+
+    ci/scripts/ci_env_report.sh
+
+So the agent can have any Jenkins label, but it must have the required tools.
+
+## More documentation
+
+Read:
+
+- `docs/CI_RUNBOOK.md`
+- `ci/README_CI.md`
+- `ci/jenkins/README_LOG_RECORDER.md`
