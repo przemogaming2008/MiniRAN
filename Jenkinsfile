@@ -66,6 +66,12 @@ pipeline {
                 sh 'bash ci/scripts/ci_mega_gate.sh'
             }
         }
+
+        stage('07 Sanitizers') {
+            steps {
+                sh 'bash ci/scripts/ci_test_sanitizers.sh'
+            }
+        }
     }
 
     post {
