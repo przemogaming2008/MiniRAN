@@ -22,6 +22,15 @@ const char* transportModeName(TransportMode mode)
 
 }  // namespace
 
+double SimulationResult::deliveryRatio() const {
+    if (packetsGenerated == 0) {
+        return 1.0;
+    }
+
+    return static_cast<double>(packetsDeliveredToCore) /
+           static_cast<double>(packetsGenerated);
+}
+
 bool SimulationResult::isHealthy() const {
     if (!attachSucceeded) {
         return false;
@@ -65,6 +74,13 @@ bool SimulationResult::isHealthy() const {
         return false;
     }
 
+    if (transportMode == TransportMode::Udp &&
+        packetsGenerated > 0 &&
+        deliveryRatio() < minDeliveryRatio)
+    {
+        return false;
+    }
+
     if (bytesGenerated > 0 && bytesDeliveredToCore == 0) {
         return false;
     }
@@ -80,6 +96,9 @@ std::string SimulationResult::summary() const {
     std::ostringstream output;
     output << "Scenario: " << scenarioName << '\n';
     output << "Transport mode: " << transportModeName(transportMode) << '\n';
+    output << std::fixed << std::setprecision(3);
+    output << "Delivery ratio: " << deliveryRatio() << '\n';
+    output << "Required min delivery ratio: " << minDeliveryRatio << '\n';
     output << "Duration [ms]: " << totalDurationMs << '\n';
     output << "Attach succeeded: " << (attachSucceeded ? "yes" : "no") << '\n';
     output << "Traffic started: " << (trafficStarted ? "yes" : "no") << '\n';
@@ -95,7 +114,7 @@ std::string SimulationResult::summary() const {
     output << "Packets delivered by network: " << packetsDeliveredByNetwork << '\n';
     output << "Active sessions at end: " << activeSessionsAtEnd << '\n';
     output << "Expired sessions: " << expiredSessions << '\n';
-    output << std::fixed << std::setprecision(3) << "Throughput [Mbps]: " << throughputMbps << '\n';
+    output << "Throughput [Mbps]: " << throughputMbps << '\n';
     if (!notes.empty()) {
         output << "Notes:" << '\n';
         for (const auto& note : notes) {

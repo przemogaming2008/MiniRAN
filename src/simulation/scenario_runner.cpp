@@ -52,6 +52,7 @@ SimulationResult ScenarioRunner::run() {
     SimulationResult result;
     result.scenarioName = config_.scenarioName;
     result.transportMode = config_.linkProfile.mode;
+    result.minDeliveryRatio = config_.healthPolicy.minDeliveryRatio;
 
     Ue ue(config_.ueId, config_.accessNodeId,config_.timers);
     AccessNode accessNode(config_.accessNodeId, config_.ueId, CoreNetwork(config_.timers));
@@ -209,6 +210,15 @@ SimulationResult ScenarioRunner::run() {
 
     if (result.activeSessionsAtEnd != 0) {
         result.notes.push_back("CoreNetwork still has active sessions at the end.");
+    }
+
+    if (config_.linkProfile.mode == TransportMode::Udp &&
+        result.packetsGenerated > 0 &&
+        result.deliveryRatio() < result.minDeliveryRatio)
+    {
+        result.notes.push_back(
+            "UDP delivery ratio is below configured minimum."
+        );
     }
 
     if (!result.isHealthy()) {

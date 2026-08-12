@@ -12,9 +12,11 @@ namespace miniran {
 
 struct SimulationResult {
     bool isHealthy() const;
+    double deliveryRatio() const;
 
     std::string scenarioName;
     TransportMode transportMode = TransportMode::Tcp;
+    double minDeliveryRatio = 0.50;
 
     std::size_t totalDurationMs = 0;
     bool attachSucceeded = false;

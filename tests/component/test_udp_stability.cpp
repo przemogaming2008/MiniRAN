@@ -32,6 +32,7 @@ TEST_CASE(component_udp_run_survives_moderate_loss) {
     config.trafficProfile.burstPackets = 8;
     config.trafficProfile.burstIntervalMs = 100;
 
+    config.healthPolicy.minDeliveryRatio = 0.45;
     ScenarioRunner runner(config);
     const auto result = runner.run();
 
@@ -49,6 +50,7 @@ TEST_CASE(component_udp_run_survives_moderate_loss) {
 
     ASSERT_TRUE(result.packetsGenerated > 0);
     ASSERT_TRUE(result.packetsDeliveredToCore > 0);
+    ASSERT_TRUE(result.deliveryRatio() >= result.minDeliveryRatio);
 
     ASSERT_TRUE(result.throughputMbps > 0.0);
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 
@@ -8,6 +9,10 @@
 #include "miniran/transport/link_profile.h"
 
 namespace miniran {
+
+struct HealthPolicy {
+    double minDeliveryRatio = 0.50;
+};
 
 struct ScenarioConfig {
     std::string scenarioName = "default";
@@ -20,6 +25,7 @@ struct ScenarioConfig {
     SessionTimers timers{};
     LinkProfile linkProfile{};
     TrafficProfile trafficProfile{};
+    HealthPolicy healthPolicy{};
 
     static std::optional<ScenarioConfig> fromFile(const std::string& path, std::string& error);
 };

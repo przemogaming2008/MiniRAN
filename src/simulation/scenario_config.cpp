@@ -31,7 +31,7 @@ std::optional<std::string> readValue(const std::unordered_map<std::string, std::
 }
 
 const std::unordered_set<std::string>& knownConfigKeys() {
-    static const std::unordered_set<std::string> keys = {
+        static const std::unordered_set<std::string> keys = {
         "scenario_name",
         "transport_mode",
         "traffic_pattern",
@@ -62,7 +62,9 @@ const std::unordered_set<std::string>& knownConfigKeys() {
         "burst_packets",
         "burst_interval_ms",
         "ramp_start_pps",
-        "ramp_end_pps"
+        "ramp_end_pps",
+
+        "min_delivery_ratio"
     };
 
     return keys;
@@ -316,6 +318,16 @@ std::optional<ScenarioConfig> ScenarioConfig::fromFile(const std::string& path, 
     if (!parseUnsigned32("jitter_ms", config.linkProfile.jitterMs)) return std::nullopt;
     if (!parseDouble("loss_percent", config.linkProfile.lossPercent)) return std::nullopt;
     if (!parseDouble("reorder_percent", config.linkProfile.reorderPercent)) return std::nullopt;
+    if (!parseDouble("min_delivery_ratio", config.healthPolicy.minDeliveryRatio)) {
+        return std::nullopt;
+    }
+
+    if (config.healthPolicy.minDeliveryRatio < 0.0 ||
+        config.healthPolicy.minDeliveryRatio > 1.0)
+    {
+        error = "min_delivery_ratio must be between 0.0 and 1.0";
+        return std::nullopt;
+    }
     if (!parseUnsigned("bandwidth_kbps", config.linkProfile.bandwidthKbps)) return std::nullopt;
     if (!parseSize("queue_limit_packets", config.linkProfile.queueLimitPackets)) return std::nullopt;
 
