@@ -87,7 +87,13 @@ pipeline {
                 }
             }
 
-            archiveArtifacts artifacts: 'ci_out/**/*', fingerprint: true, allowEmptyArchive: true
+                        script {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                    archiveArtifacts artifacts: 'ci_out/**/*',
+                        fingerprint: true,
+                        allowEmptyArchive: true
+                }
+            }
 
             script {
                 def hasJUnitReports = sh(
