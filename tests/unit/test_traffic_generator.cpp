@@ -3,20 +3,72 @@
 
 using namespace miniran;
 
-TEST_CASE(cbr_generator_emits_expected_packet_count)
-{
+namespace {
+
+TrafficProfile makeCbrProfile(std::uint32_t packetsPerSecond, std::uint64_t durationMs = 1000) {
     TrafficProfile profile;
     profile.pattern = TrafficPattern::ConstantBitrate;
-    profile.durationMs = 1000;
+    profile.durationMs = durationMs;
     profile.packetSizeBytes = 128;
-    profile.packetsPerSecond = 10;
+    profile.packetsPerSecond = packetsPerSecond;
+    return profile;
+}
+
+}  // namespace
+
+TEST_CASE(cbr_generator_emits_expected_packet_count)
+{
+    TrafficProfile profile = makeCbrProfile(10);
 
     TrafficGenerator generator(profile, 7);
     const auto events = generator.generate();
 
     ASSERT_EQ(events.size(), 10U);
     ASSERT_EQ(events.front().timestampMs, 0U);
+    ASSERT_EQ(events.back().timestampMs, 900U);
     ASSERT_EQ(events.back().payload.size(), 128U);
+}
+
+TEST_CASE(cbr_generator_does_not_emit_extra_packet_for_fractional_intervals)
+{
+    {
+        TrafficGenerator generator(makeCbrProfile(11), 7);
+        const auto events = generator.generate();
+
+        ASSERT_EQ(events.size(), 11U);
+        ASSERT_EQ(events.front().timestampMs, 0U);
+        ASSERT_TRUE(events.back().timestampMs < 1000U);
+    }
+
+    {
+        TrafficGenerator generator(makeCbrProfile(21), 7);
+        const auto events = generator.generate();
+
+        ASSERT_EQ(events.size(), 21U);
+        ASSERT_EQ(events.front().timestampMs, 0U);
+        ASSERT_TRUE(events.back().timestampMs < 1000U);
+    }
+
+    {
+        TrafficGenerator generator(makeCbrProfile(60), 7);
+        const auto events = generator.generate();
+
+        ASSERT_EQ(events.size(), 60U);
+        ASSERT_EQ(events.front().timestampMs, 0U);
+        ASSERT_TRUE(events.back().timestampMs < 1000U);
+    }
+}
+
+TEST_CASE(cbr_generator_handles_partial_second_without_drift)
+{
+    TrafficProfile profile = makeCbrProfile(11, 1500);
+
+    TrafficGenerator generator(profile, 7);
+    const auto events = generator.generate();
+
+    ASSERT_EQ(events.size(), 17U);
+    ASSERT_EQ(events.front().timestampMs, 0U);
+    ASSERT_TRUE(events.back().timestampMs < 1500U);
 }
 
 TEST_CASE(bursty_generator_creates_multiple_packets_per_burst)
