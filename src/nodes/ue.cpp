@@ -226,10 +226,7 @@ void Ue::onDatagram(const Datagram& datagram, std::uint64_t nowMs)
     }
 
     if (protocolMessage.header.messageType == MessageType::AttachReject) {
-        if (sessionManager_.state() == SessionState::Attaching) {
-            sessionManager_.reset();
-        }
-
+        sessionManager_.onAttachRejected(nowMs);
         return;
     }
 

@@ -34,6 +34,7 @@ public:
 
     bool beginAttach(std::uint64_t nowMs);
     bool onAttachAccepted(std::uint32_t sessionId, std::uint64_t nowMs);
+    bool onAttachRejected(std::uint64_t nowMs);
     bool beginDetach(std::uint64_t nowMs);
     bool onDetachAccepted(std::uint64_t nowMs);
     void onHeartbeatResponse(std::uint64_t nowMs);

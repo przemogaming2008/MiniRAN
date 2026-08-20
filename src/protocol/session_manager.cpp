@@ -84,6 +84,21 @@ bool SessionManager::onAttachAccepted(std::uint32_t sessionId, std::uint64_t now
 
     return true;
 }
+bool SessionManager::onAttachRejected(std::uint64_t nowMs) {
+    if (state_ != SessionState::Attaching) {
+        return false;
+    }
+
+    state_ = SessionState::Rejected;
+    sessionId_ = 0;
+    attachRetryCount_ = 0;
+    detachRetryCount_ = 0;
+    lastControlTxMs_ = nowMs;
+    lastHeartbeatTxMs_ = 0;
+    lastHeartbeatAckMs_ = 0;
+
+    return true;
+}
 
 bool SessionManager::beginDetach(std::uint64_t nowMs) {
 
