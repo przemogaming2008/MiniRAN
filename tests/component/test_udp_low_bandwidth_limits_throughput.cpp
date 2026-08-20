@@ -53,10 +53,16 @@ TEST_CASE(component_low_bandwidth_limits_throughput) {
     ASSERT_TRUE(result.bytesGenerated > 0);
     ASSERT_TRUE(result.bytesDeliveredToCore > 0);
 
-    const double offeredMbps = offeredThroughputMbps(result, config.trafficProfile.durationMs);
-    const double linkLimitMbps = static_cast<double>(config.linkProfile.bandwidthKbps) / 1000.0;
+    const double offeredMbps =
+        offeredThroughputMbps(result, config.trafficProfile.durationMs);
+
+    const double linkLimitMbps =
+        static_cast<double>(config.linkProfile.bandwidthKbps) / 1000.0;
+
+    const double toleranceMbps = 0.02;
 
     ASSERT_TRUE(offeredMbps > linkLimitMbps);
     ASSERT_TRUE(result.packetsDroppedInNetwork > 0);
     ASSERT_TRUE(result.throughputMbps < offeredMbps);
+    ASSERT_TRUE(result.throughputMbps <= linkLimitMbps + toleranceMbps);
 }

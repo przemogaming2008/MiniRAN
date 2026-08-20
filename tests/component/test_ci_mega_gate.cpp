@@ -136,4 +136,11 @@ TEST_CASE(component_tcp_rejected_network_submissions_are_unhealthy) {
 
     ASSERT_TRUE(result.rejectedNetworkSubmissions > 0);
     ASSERT_TRUE(!result.isHealthy());
+
+        const double maxThroughputMbps =
+        static_cast<double>(config.linkProfile.bandwidthKbps) / 1000.0;
+
+    const double toleranceMbps = 0.02;
+
+    ASSERT_TRUE(result.throughputMbps <= maxThroughputMbps + toleranceMbps);
 }

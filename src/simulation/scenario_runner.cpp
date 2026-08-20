@@ -2,6 +2,7 @@
 
 #include <string>
 #include <utility>
+#include <algorithm>
 
 #include "miniran/nodes/access_node.h"
 #include "miniran/nodes/ue.h"
@@ -107,11 +108,23 @@ SimulationResult ScenarioRunner::run() {
     }
 
     const std::uint64_t trafficStartMs = nowMs;
+    const std::uint64_t trafficEndMs =
+        trafficStartMs + config_.trafficProfile.durationMs;
+
+    const std::size_t bytesDeliveredAtTrafficStart =
+        accessNode.coreNetwork().deliveredBytes();
+
     std::size_t eventIndex = 0;
 
-    while (nowMs < trafficStartMs + config_.trafficProfile.durationMs) {
-        while (eventIndex < trafficEvents.size() &&
-               trafficStartMs + trafficEvents[eventIndex].timestampMs <= nowMs) {
+    while (true) {
+        while (eventIndex < trafficEvents.size()) {
+            const std::uint64_t eventTimeMs =
+                trafficStartMs + trafficEvents[eventIndex].timestampMs;
+
+            if (eventTimeMs > nowMs || eventTimeMs > trafficEndMs) {
+                break;
+            }
+
             if (ue.isAttached()) {
                 result.trafficStarted = true;
             }
@@ -120,7 +133,26 @@ SimulationResult ScenarioRunner::run() {
             ++eventIndex;
         }
 
-        nowMs += config_.stepMs;
+        if (nowMs >= trafficEndMs) {
+            break;
+        }
+
+        std::uint64_t nextMs = trafficEndMs;
+
+        if (config_.stepMs < trafficEndMs - nowMs) {
+            nextMs = nowMs + config_.stepMs;
+        }
+
+        if (eventIndex < trafficEvents.size()) {
+            const std::uint64_t nextEventTimeMs =
+                trafficStartMs + trafficEvents[eventIndex].timestampMs;
+
+            if (nextEventTimeMs > nowMs && nextEventTimeMs < nextMs) {
+                nextMs = nextEventTimeMs;
+            }
+        }
+
+        nowMs = nextMs;
 
         ue.tick(nowMs);
         accessNode.tick(nowMs);
@@ -128,6 +160,9 @@ SimulationResult ScenarioRunner::run() {
         rejectedNetworkSubmissions += submitOutgoing(network, accessNode.flushOutgoing(), nowMs);
         deliverReady(network, ue, accessNode, nowMs);
     }
+
+    const std::size_t bytesDeliveredAtTrafficEnd =
+        accessNode.coreNetwork().deliveredBytes();
 
     ue.startDetach(nowMs);
     rejectedNetworkSubmissions += submitOutgoing(network, ue.flushOutgoing(), nowMs);
@@ -184,9 +219,12 @@ SimulationResult ScenarioRunner::run() {
     result.expiredSessions = accessNode.coreNetwork().expiredSessions();
     result.rejectedNetworkSubmissions = rejectedNetworkSubmissions;
 
+    const std::size_t bytesDeliveredDuringTraffic =
+        bytesDeliveredAtTrafficEnd - bytesDeliveredAtTrafficStart;
+
     result.throughputMbps = (config_.trafficProfile.durationMs == 0)
                                 ? 0.0
-                                : (static_cast<double>(result.bytesDeliveredToCore) * 8.0) /
+                                : (static_cast<double>(bytesDeliveredDuringTraffic) * 8.0) /
                                       (static_cast<double>(config_.trafficProfile.durationMs) / 1000.0) /
                                       1'000'000.0;
 
