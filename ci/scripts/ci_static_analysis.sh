@@ -19,6 +19,11 @@ REPORT="$REPORT_DIR/static-analysis.xml"
 REPORT_TMP="$REPORT.tmp"
 COMPILE_COMMANDS="$BUILD_DIR/compile_commands.json"
 
+CMAKE_GENERATOR_ARGS=()
+if command -v ninja >/dev/null 2>&1; then
+  CMAKE_GENERATOR_ARGS=(-G Ninja)
+fi
+
 failures=0
 warnings=0
 tests=0
@@ -128,16 +133,43 @@ log ""
 
 log "[STATIC] Configuring static analysis build"
 
-if cmake -S "$ROOT_DIR" -B "$BUILD_DIR" \
+configure_static_build() {
+  local generator_name="$1"
+  shift
+
+  rm -rf "${BUILD_DIR:?}"
+  mkdir -p "$BUILD_DIR"
+
+  log "[STATIC] CMake generator: $generator_name"
+
+  cmake -S "$ROOT_DIR" -B "$BUILD_DIR" \
+    "$@" \
     -DMINIRAN_BUILD_TESTS=ON \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-    >> "$LOG" 2>&1; then
-  add_pass_case "cmake-configure-static-analysis"
-else
-  error_log "CMake configure failed"
-  add_fail_case "cmake-configure-static-analysis" "CMake configure failed. See static-analysis.log."
-  write_junit
-  exit 1
+    >> "$LOG" 2>&1
+}
+
+configured=0
+
+if command -v ninja >/dev/null 2>&1; then
+  if configure_static_build "Ninja" -G Ninja; then
+    configured=1
+    add_pass_case "cmake-configure-static-analysis"
+  else
+    warn "Ninja configure failed; retrying with default CMake generator."
+  fi
+fi
+
+if [[ "$configured" -eq 0 ]]; then
+  if configure_static_build "default"; then
+    configured=1
+    add_pass_case "cmake-configure-static-analysis"
+  else
+    error_log "CMake configure failed"
+    add_fail_case "cmake-configure-static-analysis" "CMake configure failed with Ninja/default generator. See static-analysis.log."
+    write_junit
+    exit 1
+  fi
 fi
 
 if [[ -f "$COMPILE_COMMANDS" ]]; then
