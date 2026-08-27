@@ -15,6 +15,7 @@ pipeline {
         CI_REPORT_DIR = 'ci_out/reports'
         CI_ARTIFACT_DIR = 'ci_out/artifacts'
         CI_EXPECT_TEST_REPORTS = 'false'
+        MINIRAN_STATIC_ANALYSIS_STRICT = '0'
     }
 
     stages {
@@ -72,6 +73,12 @@ pipeline {
                 sh 'bash ci/scripts/ci_test_sanitizers.sh'
             }
         }
+
+        stage('08 Static analysis') {
+            steps {
+                sh 'bash ci/scripts/ci_static_analysis.sh'
+            }
+        }
     }
 
     post {
@@ -87,7 +94,7 @@ pipeline {
                 }
             }
 
-                        script {
+            script {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                     archiveArtifacts artifacts: 'ci_out/**/*',
                         fingerprint: true,
