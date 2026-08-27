@@ -23,7 +23,7 @@ For the sanitizer stage:
 - MSVC can use AddressSanitizer
 - on Windows/MSVC, Visual Studio ASan runtime may be needed:
 
-    clang_rt.asan_dynamic-x86_64.dll
+  clang_rt.asan_dynamic-x86_64.dll
 
 The Jenkinsfile uses:
 
@@ -42,6 +42,7 @@ Run from repository root:
     bash ci/scripts/ci_run_cli_scenarios.sh
     bash ci/scripts/ci_mega_gate.sh
     bash ci/scripts/ci_test_sanitizers.sh
+    bash ci/scripts/ci_static_analysis.sh
     bash ci/scripts/ci_collect_logs.sh
 
 This sequence should match the normal Jenkins pipeline.
@@ -219,6 +220,52 @@ A sanitizer failure is a real CI failure.
 
 On Windows/MSVC, if this stage fails with missing `clang_rt.asan_dynamic-x86_64.dll`, check the Visual Studio C++ AddressSanitizer runtime installation.
 
+### 08 Static analysis
+
+Runs:
+
+    bash ci/scripts/ci_static_analysis.sh
+
+Build directory:
+
+    build/static-analysis
+
+Main log:
+
+    ci_out/logs/static-analysis.log
+
+Report:
+
+    ci_out/reports/static-analysis.xml
+
+Optional extra logs may be created when tools are available:
+
+    ci_out/logs/static-cppcheck.log
+    ci_out/logs/static-clang-tidy.log
+    ci_out/logs/static-shellcheck.log
+    ci_out/logs/static-cmake-format.log
+
+This stage checks source quality with external static analysis tools.
+
+Supported tools:
+
+- cppcheck
+- clang-tidy
+- shellcheck
+- cmake-format
+
+Default mode:
+
+    MINIRAN_STATIC_ANALYSIS_STRICT=0
+
+In default mode, missing tools are reported as warnings.
+
+Strict mode:
+
+    MINIRAN_STATIC_ANALYSIS_STRICT=1
+
+In strict mode, missing tools or static analysis failures fail the stage.
+
 ## 4. Post actions
 
 After every build Jenkins tries to:
@@ -382,6 +429,24 @@ Check Jenkins job configuration:
 - checkout log
 - Jenkins system log
 
+### Static analysis fails
+
+Open:
+
+    ci_out/logs/static-analysis.log
+    ci_out/reports/static-analysis.xml
+
+Then check tool-specific logs if they exist:
+
+    ci_out/logs/static-cppcheck.log
+    ci_out/logs/static-clang-tidy.log
+    ci_out/logs/static-shellcheck.log
+    ci_out/logs/static-cmake-format.log
+
+If tools are missing and strict mode is disabled, this should be a warning.
+
+If strict mode is enabled, install the missing tools or disable strict mode.
+
 ## 7. Manual verification commands
 
 Check aggregate target:
@@ -409,6 +474,14 @@ Run sanitizer stage manually:
 
     bash ci/scripts/ci_test_sanitizers.sh
 
+Run static analysis manually:
+
+    bash ci/scripts/ci_static_analysis.sh
+
+Run static analysis in strict mode:
+
+    MINIRAN_STATIC_ANALYSIS_STRICT=1 bash ci/scripts/ci_static_analysis.sh
+    
 ## 8. Controlled failure check
 
 Use this only to test diagnostics. Do not commit controlled failures.
@@ -439,9 +512,9 @@ Use this only to test diagnostics. Do not commit controlled failures.
 1. Add a temporary memory error in a test.
 2. Run:
 
-       bash ci/scripts/ci_test_sanitizers.sh
-
+   bash ci/scripts/ci_test_sanitizers.sh
 3. Expected result:
+
    - sanitizer stage fails
    - sanitizer logs are written
    - JUnit reports are written when possible

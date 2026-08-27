@@ -167,6 +167,54 @@ On MSVC it enables AddressSanitizer. On Windows, the script also tries to find t
 
     clang_rt.asan_dynamic-x86_64.dll
 
+### ci_static_analysis.sh
+
+Purpose:
+
+- configures a separate static analysis build
+- creates `compile_commands.json`
+- runs static analysis tools when available
+- writes a JUnit report
+
+Build directory:
+
+    build/static-analysis
+
+Tools used when available:
+
+- cppcheck
+- clang-tidy
+- shellcheck
+- cmake-format
+
+Default mode:
+
+    MINIRAN_STATIC_ANALYSIS_STRICT=0
+
+In default mode, missing tools are warnings.
+
+Strict mode:
+
+    MINIRAN_STATIC_ANALYSIS_STRICT=1
+
+In strict mode, missing tools or analysis failures fail the stage.
+
+Outputs:
+
+    ci_out/logs/static-analysis.log
+    ci_out/reports/static-analysis.xml
+
+Optional tool logs:
+
+    ci_out/logs/static-cppcheck.log
+    ci_out/logs/static-clang-tidy.log
+    ci_out/logs/static-shellcheck.log
+    ci_out/logs/static-cmake-format.log
+
+Run:
+
+    bash ci/scripts/ci_static_analysis.sh
+
 ### ci_collect_logs.sh
 
 Purpose:
@@ -196,6 +244,7 @@ If tar or gzip fails, Jenkins should still archive raw `ci_out` files.
     bash ci/scripts/ci_run_cli_scenarios.sh
     bash ci/scripts/ci_mega_gate.sh
     bash ci/scripts/ci_test_sanitizers.sh
+    bash ci/scripts/ci_static_analysis.sh
     bash ci/scripts/ci_collect_logs.sh
 
 This sequence should match the normal Jenkins pipeline.

@@ -25,6 +25,7 @@ The project contains:
 - Bash CI scripts
 - JUnit XML reports
 - collected logs and artifacts
+- static analysis CI stage
 
 ## What this project is not
 
@@ -80,6 +81,7 @@ Run from repository root:
     bash ci/scripts/ci_run_cli_scenarios.sh
     bash ci/scripts/ci_mega_gate.sh
     bash ci/scripts/ci_test_sanitizers.sh
+    bash ci/scripts/ci_static_analysis.sh
     bash ci/scripts/ci_collect_logs.sh
 
 This sequence should match the normal Jenkins pipeline.
@@ -183,6 +185,38 @@ On MSVC it enables AddressSanitizer. On Windows, the script also tries to find t
 
 A sanitizer failure is treated as a real CI failure.
 
+## Static analysis
+
+The Jenkins pipeline runs a static analysis stage after Sanitizers.
+
+The static analysis stage uses:
+
+    ci/scripts/ci_static_analysis.sh
+
+It creates a separate build directory:
+
+    build/static-analysis
+
+It can use these tools when available:
+
+- cppcheck
+- clang-tidy
+- shellcheck
+- cmake-format
+
+By default, missing static analysis tools are reported as warnings.
+
+Strict mode can be enabled with:
+
+    MINIRAN_STATIC_ANALYSIS_STRICT=1
+
+In strict mode, missing tools or static analysis failures fail the stage.
+
+Outputs:
+
+    ci_out/logs/static-analysis.log
+    ci_out/reports/static-analysis.xml
+
 ## Jenkins
 
 The Jenkins pipeline is defined in:
@@ -201,6 +235,8 @@ So the agent can have any Jenkins label, but it must have the required tools.
 
 The normal Jenkins pipeline runs:
 
+The normal Jenkins pipeline runs:
+
 1. preflight
 2. build
 3. unit tests
@@ -208,7 +244,8 @@ The normal Jenkins pipeline runs:
 5. CLI scenarios
 6. Mega Gate
 7. Sanitizers
-8. post-build log collection, artifact archiving and JUnit publishing
+8. Static analysis
+9. post-build log collection, artifact archiving and JUnit publishing
 
 ## More documentation
 
