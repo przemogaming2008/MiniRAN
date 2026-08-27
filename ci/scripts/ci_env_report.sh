@@ -132,12 +132,34 @@ check_repo_root() {
     fail_check "current directory is not repository root: missing src/"
   fi
 
+  if [[ ! -d "$ROOT_DIR/include" ]]; then
+    fail_check "current directory is not repository root: missing include/"
+  fi
+
+  if [[ ! -d "$ROOT_DIR/tests" ]]; then
+    fail_check "current directory is not repository root: missing tests/"
+  fi
+
   if [[ ! -d "$ROOT_DIR/ci/scripts" ]]; then
     fail_check "current directory is not repository root: missing ci/scripts/"
   fi
 
-  if [[ -f "$ROOT_DIR/CMakeLists.txt" && -d "$ROOT_DIR/src" && -d "$ROOT_DIR/ci/scripts" ]]; then
+  if [[ -f "$ROOT_DIR/CMakeLists.txt" &&
+        -d "$ROOT_DIR/src" &&
+        -d "$ROOT_DIR/include" &&
+        -d "$ROOT_DIR/tests" &&
+        -d "$ROOT_DIR/ci/scripts" ]]; then
     pass_check "current directory looks like repository root"
+  fi
+}
+
+check_file_exists() {
+  local file="$1"
+
+  if [[ ! -f "$ROOT_DIR/$file" ]]; then
+    fail_check "required file missing: $file"
+  else
+    pass_check "required file exists: $file"
   fi
 }
 
@@ -148,25 +170,201 @@ check_required_files() {
   local files=(
     "CMakeLists.txt"
     "Jenkinsfile"
+    "README.md"
+    "docs/CI_RUNBOOK.md"
+    "ci/README_CI.md"
+    "ci/jenkins/README_LOG_RECORDER.md"
+
     "ci/scripts/ci_env_report.sh"
     "ci/scripts/ci_build.sh"
     "ci/scripts/ci_test_unit.sh"
     "ci/scripts/ci_test_component.sh"
     "ci/scripts/ci_run_cli_scenarios.sh"
     "ci/scripts/ci_mega_gate.sh"
+    "ci/scripts/ci_test_sanitizers.sh"
     "ci/scripts/ci_collect_logs.sh"
+
     "src/main.cpp"
+    "src/simulation/scenario_runner.cpp"
+    "src/simulation/simulation_result.cpp"
+    "src/traffic/traffic_generator.cpp"
+    "src/nodes/ue.cpp"
+
+    "include/miniran/simulation/scenario_config.h"
+    "include/miniran/simulation/simulation_result.h"
+    "include/miniran/traffic/traffic_generator.h"
+    "include/miniran/nodes/ue.h"
+
+    "tests/test_main.cpp"
+    "tests/component/test_ci_mega_gate.cpp"
+    "tests/component/test_udp_low_bandwidth_limits_throughput.cpp"
+    "tests/component/test_tcp_traffic.cpp"
+    "tests/unit/test_traffic_generator.cpp"
+
     "scenarios/tcp_basic.cfg"
     "scenarios/udp_lossy.cfg"
+    "scenarios/ci_tcp_heavy.cfg"
+    "scenarios/ci_udp_loss_15.cfg"
+    "scenarios/ci_low_bandwidth.cfg"
   )
 
   for file in "${files[@]}"; do
-    if [[ ! -f "$ROOT_DIR/$file" ]]; then
-      fail_check "required file missing: $file"
-    fi
+    check_file_exists "$file"
   done
 
   pass_check "required file check completed"
+}
+
+check_script_executable_bits() {
+  echo "" | tee -a "$LOG"
+  echo "[script-executable-bits]" | tee -a "$LOG"
+
+  local scripts=(
+    "ci/scripts/ci_env_report.sh"
+    "ci/scripts/ci_build.sh"
+    "ci/scripts/ci_test_unit.sh"
+    "ci/scripts/ci_test_component.sh"
+    "ci/scripts/ci_run_cli_scenarios.sh"
+    "ci/scripts/ci_mega_gate.sh"
+    "ci/scripts/ci_test_sanitizers.sh"
+    "ci/scripts/ci_collect_logs.sh"
+  )
+
+  for script in "${scripts[@]}"; do
+    if [[ ! -f "$ROOT_DIR/$script" ]]; then
+      fail_check "script missing, cannot check executable bit: $script"
+      continue
+    fi
+
+    if [[ -x "$ROOT_DIR/$script" ]]; then
+      pass_check "script is executable in filesystem: $script"
+    else
+      echo "[CI] WARNING: script is not executable in filesystem: $script" | tee -a "$LOG"
+      echo "[CI] Jenkins can still run it through bash, but direct ./script usage may fail." | tee -a "$LOG"
+    fi
+
+    if command -v git >/dev/null 2>&1 && [[ -d "$ROOT_DIR/.git" ]]; then
+      local git_mode
+      git_mode="$(git -C "$ROOT_DIR" ls-files --stage -- "$script" | awk '{print $1}' || true)"
+
+      if [[ "$git_mode" == "100755" ]]; then
+        pass_check "script executable bit is tracked by Git: $script"
+      else
+        fail_check "script executable bit is not tracked by Git: $script"
+      fi
+    fi
+  done
+}
+
+check_scenarios() {
+  echo "" | tee -a "$LOG"
+  echo "[scenarios]" | tee -a "$LOG"
+
+  if [[ ! -d "$ROOT_DIR/scenarios" ]]; then
+    fail_check "scenarios directory missing"
+    return
+  fi
+
+  local scenario_count
+  scenario_count="$(find "$ROOT_DIR/scenarios" -maxdepth 1 -type f -name "*.cfg" | wc -l | tr -d ' ')"
+
+  echo "Scenario count: $scenario_count" | tee -a "$LOG"
+
+  if [[ "$scenario_count" -lt 5 ]]; then
+    fail_check "expected at least 5 scenario cfg files"
+  else
+    pass_check "scenario cfg files found"
+  fi
+
+  local scenario
+  while IFS= read -r scenario; do
+    echo "Scenario: ${scenario#$ROOT_DIR/}" | tee -a "$LOG"
+
+    if ! grep -q '^scenario_name=' "$scenario"; then
+      fail_check "scenario missing scenario_name: ${scenario#$ROOT_DIR/}"
+    fi
+
+    if ! grep -q '^transport_mode=' "$scenario"; then
+      fail_check "scenario missing transport_mode: ${scenario#$ROOT_DIR/}"
+    fi
+
+    if ! grep -q '^traffic_pattern=' "$scenario"; then
+      fail_check "scenario missing traffic_pattern: ${scenario#$ROOT_DIR/}"
+    fi
+  done < <(find "$ROOT_DIR/scenarios" -maxdepth 1 -type f -name "*.cfg" | sort)
+}
+
+check_cmake_contract() {
+  echo "" | tee -a "$LOG"
+  echo "[cmake-contract]" | tee -a "$LOG"
+
+  local cmake_file="$ROOT_DIR/CMakeLists.txt"
+
+  if [[ ! -f "$cmake_file" ]]; then
+    fail_check "cannot check CMake contract: CMakeLists.txt missing"
+    return
+  fi
+
+  local required_patterns=(
+    "MINIRAN_BUILD_TESTS"
+    "MINIRAN_ENABLE_SANITIZERS"
+    "miniran_unit_tests"
+    "miniran_component_tests"
+    "miniran_mega_tests"
+    "miniran_tests"
+    "unit_tests"
+    "component_tests"
+    "mega_gate_tests"
+    "all_tests"
+    "LABELS \"unit\""
+    "LABELS \"component\""
+    "LABELS \"mega\""
+    "LABELS \"all\""
+  )
+
+  local pattern
+  for pattern in "${required_patterns[@]}"; do
+    if grep -q "$pattern" "$cmake_file"; then
+      pass_check "CMake contract contains: $pattern"
+    else
+      fail_check "CMake contract missing: $pattern"
+    fi
+  done
+}
+
+check_jenkins_contract() {
+  echo "" | tee -a "$LOG"
+  echo "[jenkins-contract]" | tee -a "$LOG"
+
+  local jenkinsfile="$ROOT_DIR/Jenkinsfile"
+
+  if [[ ! -f "$jenkinsfile" ]]; then
+    fail_check "cannot check Jenkins contract: Jenkinsfile missing"
+    return
+  fi
+
+  local required_patterns=(
+    "agent any"
+    "ci_env_report.sh"
+    "ci_build.sh"
+    "ci_test_unit.sh"
+    "ci_test_component.sh"
+    "ci_run_cli_scenarios.sh"
+    "ci_mega_gate.sh"
+    "ci_test_sanitizers.sh"
+    "ci_collect_logs.sh"
+    "archiveArtifacts"
+    "junit"
+  )
+
+  local pattern
+  for pattern in "${required_patterns[@]}"; do
+    if grep -q "$pattern" "$jenkinsfile"; then
+      pass_check "Jenkinsfile contains: $pattern"
+    else
+      fail_check "Jenkinsfile missing: $pattern"
+    fi
+  done
 }
 
 check_write_access() {
@@ -255,12 +453,60 @@ check_cpp_toolchain() {
   fail_check "no C++ compiler/toolchain detected"
 }
 
+check_msvc_asan_runtime() {
+  echo "" | tee -a "$LOG"
+  echo "[msvc-asan-runtime]" | tee -a "$LOG"
+
+  case "${OSTYPE:-}" in
+    msys*|cygwin*|win32*) ;;
+    *)
+      pass_check "not a Windows shell, skipping MSVC ASan runtime check"
+      return
+      ;;
+  esac
+
+  local dll_name="clang_rt.asan_dynamic-x86_64.dll"
+  local dll_path=""
+
+  if [[ -d "/c/Program Files/Microsoft Visual Studio" ]]; then
+    dll_path="$(
+      find "/c/Program Files/Microsoft Visual Studio" \
+        -path "*/bin/Hostx64/x64/$dll_name" \
+        -print \
+        -quit \
+        2>/dev/null || true
+    )"
+  fi
+
+  if [[ -z "$dll_path" && -d "/c/Program Files (x86)/Microsoft Visual Studio" ]]; then
+    dll_path="$(
+      find "/c/Program Files (x86)/Microsoft Visual Studio" \
+        -path "*/bin/Hostx64/x64/$dll_name" \
+        -print \
+        -quit \
+        2>/dev/null || true
+    )"
+  fi
+
+  if [[ -n "$dll_path" ]]; then
+    echo "MSVC ASan runtime: $dll_path" | tee -a "$LOG"
+    pass_check "MSVC ASan runtime found"
+  else
+    echo "[CI] WARNING: MSVC ASan runtime not found." | tee -a "$LOG"
+    echo "[CI] Sanitizer stage may still work with GCC/Clang, but MSVC ASan will fail without this runtime." | tee -a "$LOG"
+  fi
+}
+
 {
   echo "## Tool checks"
 } | tee -a "$LOG"
 
 check_repo_root
 check_required_files
+check_script_executable_bits
+check_scenarios
+check_cmake_contract
+check_jenkins_contract
 check_write_access
 check_free_space
 
@@ -271,6 +517,7 @@ check_tool gzip
 check_tool_min_version cmake "$MIN_CMAKE_VERSION"
 check_tool_min_version ctest "$MIN_CTEST_VERSION"
 check_cpp_toolchain
+check_msvc_asan_runtime
 
 echo "" | tee -a "$LOG"
 
