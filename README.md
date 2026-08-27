@@ -19,6 +19,7 @@ The project contains:
 - unit tests
 - component tests
 - mega CI gate tests
+- sanitizer CI stage
 - CMake test targets
 - Jenkins pipeline
 - Bash CI scripts
@@ -46,6 +47,14 @@ Minimum local tools:
 
 On Windows, Git Bash with MSVC is supported.
 
+For the sanitizer stage:
+
+- GCC/Clang can use AddressSanitizer and UndefinedBehaviorSanitizer
+- MSVC can use AddressSanitizer
+- on Windows/MSVC, Visual Studio ASan runtime may be needed:
+
+    clang_rt.asan_dynamic-x86_64.dll
+
 ## Repository layout
 
     include/miniran/      public headers
@@ -70,13 +79,24 @@ Run from repository root:
     bash ci/scripts/ci_test_component.sh
     bash ci/scripts/ci_run_cli_scenarios.sh
     bash ci/scripts/ci_mega_gate.sh
+    bash ci/scripts/ci_test_sanitizers.sh
     bash ci/scripts/ci_collect_logs.sh
+
+This sequence should match the normal Jenkins pipeline.
 
 Generated output goes to:
 
     ci_out/logs/
     ci_out/reports/
     ci_out/artifacts/
+
+Normal build directory:
+
+    build/ci
+
+Sanitizer build directory:
+
+    build/sanitize
 
 ## Manual CMake usage
 
@@ -93,6 +113,10 @@ Run aggregate baseline test target:
 
     cmake --build build/ci --target miniran_tests
     ctest --test-dir build/ci -C Debug -L all --output-on-failure
+
+Run sanitizer stage manually:
+
+    bash ci/scripts/ci_test_sanitizers.sh
 
 Run CLI manually:
 
@@ -131,6 +155,34 @@ CTest tests:
 
 A TCP-like scenario is healthy only when generated traffic is delivered completely and there are no rejected network submissions.
 
+A UDP-like scenario is healthy only when it satisfies the configured delivery ratio policy.
+
+## Sanitizers
+
+The Jenkins pipeline runs an additional sanitizer stage after Mega Gate.
+
+The sanitizer stage uses:
+
+    ci/scripts/ci_test_sanitizers.sh
+
+It creates a separate build directory:
+
+    build/sanitize
+
+It runs:
+
+- unit tests
+- component tests
+- one CLI smoke scenario
+
+On GCC/Clang it enables AddressSanitizer and UndefinedBehaviorSanitizer when supported.
+
+On MSVC it enables AddressSanitizer. On Windows, the script also tries to find the Visual Studio ASan runtime DLL:
+
+    clang_rt.asan_dynamic-x86_64.dll
+
+A sanitizer failure is treated as a real CI failure.
+
 ## Jenkins
 
 The Jenkins pipeline is defined in:
@@ -146,6 +198,17 @@ The real environment is checked by:
     ci/scripts/ci_env_report.sh
 
 So the agent can have any Jenkins label, but it must have the required tools.
+
+The normal Jenkins pipeline runs:
+
+1. preflight
+2. build
+3. unit tests
+4. component tests
+5. CLI scenarios
+6. Mega Gate
+7. Sanitizers
+8. post-build log collection, artifact archiving and JUnit publishing
 
 ## More documentation
 
