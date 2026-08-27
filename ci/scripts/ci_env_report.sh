@@ -182,6 +182,7 @@ check_required_files() {
     "ci/scripts/ci_run_cli_scenarios.sh"
     "ci/scripts/ci_mega_gate.sh"
     "ci/scripts/ci_test_sanitizers.sh"
+    "ci/scripts/ci_static_analysis.sh"
     "ci/scripts/ci_collect_logs.sh"
 
     "src/main.cpp"
@@ -227,6 +228,7 @@ check_script_executable_bits() {
     "ci/scripts/ci_run_cli_scenarios.sh"
     "ci/scripts/ci_mega_gate.sh"
     "ci/scripts/ci_test_sanitizers.sh"
+    "ci/scripts/ci_static_analysis.sh"
     "ci/scripts/ci_collect_logs.sh"
   )
 
@@ -352,7 +354,9 @@ check_jenkins_contract() {
     "ci_run_cli_scenarios.sh"
     "ci_mega_gate.sh"
     "ci_test_sanitizers.sh"
+    "ci_static_analysis.sh"
     "ci_collect_logs.sh"
+    "Static analysis"
     "archiveArtifacts"
     "junit"
   )
