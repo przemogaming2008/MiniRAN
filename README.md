@@ -217,3 +217,4 @@ Read:
 - `docs/CI_RUNBOOK.md`
 - `ci/README_CI.md`
 - `ci/jenkins/README_LOG_RECORDER.md`
+- `ci/jenkins/README_WEBHOOK_SETUP.md`
