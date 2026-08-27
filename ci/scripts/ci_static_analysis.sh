@@ -57,6 +57,8 @@ write_junit() {
     cat "$REPORT_TMP" 2>/dev/null || true
     echo '</testsuite>'
   } > "$REPORT"
+
+  rm -f "$REPORT_TMP"
 }
 
 add_pass_case() {
@@ -124,6 +126,12 @@ require_or_record_missing() {
 
 : > "$LOG"
 : > "$REPORT_TMP"
+
+rm -f "$REPORT"
+rm -f "$LOG_DIR/static-cppcheck.log"
+rm -f "$LOG_DIR/static-clang-tidy.log"
+rm -f "$LOG_DIR/static-shellcheck.log"
+rm -f "$LOG_DIR/static-cmake-format.log"
 
 log "MiniRAN static analysis"
 log "Root: $ROOT_DIR"

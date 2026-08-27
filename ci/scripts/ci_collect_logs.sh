@@ -6,6 +6,7 @@ set -Eeuo pipefail
 : "${CI_LOG_DIR:=ci_out/logs}"
 : "${CI_REPORT_DIR:=ci_out/reports}"
 : "${CI_ARTIFACT_DIR:=ci_out/artifacts}"
+: "${STATIC_BUILD_DIR:=build/static-analysis}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -35,6 +36,14 @@ write_missing_report_note() {
   fi
 }
 
+write_missing_log_note() {
+  local log_file="$1"
+
+  if [[ ! -f "$ROOT_DIR/$CI_LOG_DIR/$log_file" ]]; then
+    echo "- Missing log: \`$CI_LOG_DIR/$log_file\`"
+  fi
+}
+
 {
   echo "# MiniRAN CI summary"
   echo ""
@@ -50,6 +59,7 @@ write_missing_report_note() {
   echo "## CI paths"
   echo ""
   echo "- Build directory: \`$BUILD_DIR\`"
+  echo "- Static analysis build directory: \`$STATIC_BUILD_DIR\`"
   echo "- CI output directory: \`$CI_OUT\`"
   echo "- Logs directory: \`$CI_LOG_DIR\`"
   echo "- Reports directory: \`$CI_REPORT_DIR\`"
@@ -74,6 +84,36 @@ write_missing_report_note() {
   write_missing_report_note "sanitize-unit-internal.xml"
   write_missing_report_note "sanitize-component-ctest.xml"
   write_missing_report_note "sanitize-component-internal.xml"
+  write_missing_report_note "static-analysis.xml"
+  echo ""
+  echo "## Expected logs"
+  echo ""
+  write_missing_log_note "env.txt"
+  write_missing_log_note "build.log"
+  write_missing_log_note "unit-ctest.log"
+  write_missing_log_note "unit-internal.log"
+  write_missing_log_note "component-ctest.log"
+  write_missing_log_note "component-internal.log"
+  write_missing_log_note "cli-scenarios.log"
+  write_missing_log_note "mega-gate.log"
+  write_missing_log_note "mega-internal.log"
+  write_missing_log_note "sanitize-build.log"
+  write_missing_log_note "sanitize-unit-ctest.log"
+  write_missing_log_note "sanitize-unit-internal.log"
+  write_missing_log_note "sanitize-component-ctest.log"
+  write_missing_log_note "sanitize-component-internal.log"
+  write_missing_log_note "sanitize-cli-smoke.log"
+  write_missing_log_note "static-analysis.log"
+  echo ""
+  echo "## Optional static analysis tool logs"
+  echo ""
+  for optional_log in static-cppcheck.log static-clang-tidy.log static-shellcheck.log static-cmake-format.log; do
+    if [[ -f "$ROOT_DIR/$CI_LOG_DIR/$optional_log" ]]; then
+      echo "- Found optional log: \`$CI_LOG_DIR/$optional_log\`"
+    else
+      echo "- Optional log not present: \`$CI_LOG_DIR/$optional_log\`"
+    fi
+  done
   echo ""
   echo "## Files collected"
   echo ""
