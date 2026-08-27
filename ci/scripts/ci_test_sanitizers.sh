@@ -92,7 +92,7 @@ add_msvc_asan_runtime_to_path() {
 
 echo "[CI] Configure sanitizer build" | tee "$SANITIZE_BUILD_LOG"
 
-rm -rf "$ROOT_DIR/$SANITIZE_BUILD_DIR"
+rm -rf "${ROOT_DIR:?}/${SANITIZE_BUILD_DIR:?}"
 
 cmake -S "$ROOT_DIR" -B "$ROOT_DIR/$SANITIZE_BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Debug \

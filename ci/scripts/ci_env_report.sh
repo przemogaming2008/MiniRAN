@@ -280,18 +280,18 @@ check_scenarios() {
 
   local scenario
   while IFS= read -r scenario; do
-    echo "Scenario: ${scenario#$ROOT_DIR/}" | tee -a "$LOG"
+    echo "Scenario: ${scenario#"$ROOT_DIR"/}" | tee -a "$LOG"
 
     if ! grep -q '^scenario_name=' "$scenario"; then
-      fail_check "scenario missing scenario_name: ${scenario#$ROOT_DIR/}"
+      fail_check "scenario missing scenario_name: ${scenario#"$ROOT_DIR"/}"
     fi
 
     if ! grep -q '^transport_mode=' "$scenario"; then
-      fail_check "scenario missing transport_mode: ${scenario#$ROOT_DIR/}"
+      fail_check "scenario missing transport_mode: ${scenario#"$ROOT_DIR"/}"
     fi
 
     if ! grep -q '^traffic_pattern=' "$scenario"; then
-      fail_check "scenario missing traffic_pattern: ${scenario#$ROOT_DIR/}"
+      fail_check "scenario missing traffic_pattern: ${scenario#"$ROOT_DIR"/}"
     fi
   done < <(find "$ROOT_DIR/scenarios" -maxdepth 1 -type f -name "*.cfg" | sort)
 }
