@@ -47,3 +47,41 @@ TEST_CASE(component_attach_then_detach_over_tcp) {
 
     ASSERT_EQ(result.packetsDroppedInNetwork, static_cast<std::size_t>(0));
 }
+TEST_CASE(component_attach_and_detach_process_partial_deadline_step) {
+    ScenarioConfig config;
+    config.scenarioName = "component_partial_deadline_step";
+    config.transportMode = TransportMode::Tcp;
+    config.stepMs = 100;
+    config.attachPhaseBudgetMs = 250;
+    config.detachPhaseBudgetMs = 250;
+
+    config.linkProfile.mode = TransportMode::Tcp;
+    config.linkProfile.latencyMs = 20;
+    config.linkProfile.jitterMs = 0;
+    config.linkProfile.lossPercent = 0.0;
+    config.linkProfile.reorderPercent = 0.0;
+    config.linkProfile.bandwidthKbps = 100'000;
+    config.linkProfile.queueLimitPackets = 128;
+
+    config.timers.attachTimeoutMs = 1000;
+    config.timers.detachTimeoutMs = 1000;
+    config.timers.heartbeatIntervalMs = 1000;
+    config.timers.inactivityTimeoutMs = 5000;
+    config.timers.maxAttachRetries = 1;
+    config.timers.maxDetachRetries = 1;
+
+    config.trafficProfile.pattern = TrafficPattern::ConstantBitrate;
+    config.trafficProfile.durationMs = 0;
+    config.trafficProfile.packetSizeBytes = 128;
+    config.trafficProfile.packetsPerSecond = 1;
+
+    ScenarioRunner runner(config);
+    const auto result = runner.run();
+
+    ASSERT_TRUE(result.attachSucceeded);
+    ASSERT_TRUE(result.detachSucceeded);
+    ASSERT_EQ(result.finalUeState, SessionState::Released);
+    ASSERT_EQ(result.activeSessionsAtEnd, static_cast<std::size_t>(0));
+    ASSERT_EQ(result.expiredSessions, static_cast<std::size_t>(0));
+    ASSERT_EQ(result.totalDurationMs, static_cast<std::uint64_t>(500));
+}

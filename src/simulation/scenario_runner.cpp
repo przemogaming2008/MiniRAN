@@ -77,11 +77,14 @@ SimulationResult ScenarioRunner::run() {
     const std::uint64_t attachDeadlineMs = config_.attachPhaseBudgetMs;
 
     while (!ue.isAttached()) {
-        if (nowMs >= attachDeadlineMs || config_.stepMs > attachDeadlineMs - nowMs) {
+        if (nowMs >= attachDeadlineMs) {
             break;
         }
 
-        nowMs += config_.stepMs;
+        const std::uint64_t stepMs =
+            std::min(config_.stepMs, attachDeadlineMs - nowMs);
+
+        nowMs += stepMs;
 
         ue.tick(nowMs);
         accessNode.tick(nowMs);
@@ -173,11 +176,14 @@ SimulationResult ScenarioRunner::run() {
     while (ue.isAttached() ||
            ue.state() == SessionState::Detaching ||
            accessNode.coreNetwork().activeSessionCount() > 0) {
-        if (nowMs >= detachDeadlineMs || config_.stepMs > detachDeadlineMs - nowMs) {
+        if (nowMs >= detachDeadlineMs) {
             break;
         }
 
-        nowMs += config_.stepMs;
+        const std::uint64_t stepMs =
+            std::min(config_.stepMs, detachDeadlineMs - nowMs);
+
+        nowMs += stepMs;
 
         ue.tick(nowMs);
         accessNode.tick(nowMs);
