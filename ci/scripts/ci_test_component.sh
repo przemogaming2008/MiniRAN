@@ -10,12 +10,19 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 mkdir -p "$ROOT_DIR/$CI_LOG_DIR" "$ROOT_DIR/$CI_REPORT_DIR"
 
-ctest --test-dir "$ROOT_DIR/$BUILD_DIR" \
+stage_status=0
+
+if ctest --test-dir "$ROOT_DIR/$BUILD_DIR" \
   -C "${CTEST_CONFIG:-Debug}" \
   -L component \
   --output-on-failure \
   --output-log "$ROOT_DIR/$CI_LOG_DIR/component-ctest.log" \
-  --output-junit "$ROOT_DIR/$CI_REPORT_DIR/component-ctest.xml"
+  --output-junit "$ROOT_DIR/$CI_REPORT_DIR/component-ctest.xml"; then
+  echo "[CI] Component CTest passed."
+else
+  echo "[CI] ERROR: Component CTest failed; continuing to create detailed internal JUnit."
+  stage_status=1
+fi
 
 COMPONENT_BIN="$ROOT_DIR/$BUILD_DIR/miniran_component_tests"
 
@@ -27,5 +34,12 @@ elif [[ -x "$ROOT_DIR/$BUILD_DIR/miniran_component_tests.exe" ]]; then
   COMPONENT_BIN="$ROOT_DIR/$BUILD_DIR/miniran_component_tests.exe"
 fi
 
-"$COMPONENT_BIN" --junit "$ROOT_DIR/$CI_REPORT_DIR/component-internal.xml" \
-  2>&1 | tee "$ROOT_DIR/$CI_LOG_DIR/component-internal.log"
+if "$COMPONENT_BIN" --junit "$ROOT_DIR/$CI_REPORT_DIR/component-internal.xml" \
+  2>&1 | tee "$ROOT_DIR/$CI_LOG_DIR/component-internal.log"; then
+  echo "[CI] Component internal JUnit completed."
+else
+  echo "[CI] ERROR: Component internal test binary failed."
+  stage_status=1
+fi
+
+exit "$stage_status"

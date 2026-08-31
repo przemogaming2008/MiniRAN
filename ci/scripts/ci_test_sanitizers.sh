@@ -108,33 +108,55 @@ cmake --build "$ROOT_DIR/$SANITIZE_BUILD_DIR" --parallel "$CI_BUILD_JOBS" \
 
 add_msvc_asan_runtime_to_path
 
+sanitize_status=0
+
 echo "[CI] Run sanitizer unit tests"
 
-ctest --test-dir "$ROOT_DIR/$SANITIZE_BUILD_DIR" \
+if ctest --test-dir "$ROOT_DIR/$SANITIZE_BUILD_DIR" \
   -C "$SANITIZE_CTEST_CONFIG" \
   -L unit \
   --output-on-failure \
   --output-log "$ROOT_DIR/$CI_LOG_DIR/sanitize-unit-ctest.log" \
-  --output-junit "$ROOT_DIR/$CI_REPORT_DIR/sanitize-unit-ctest.xml"
+  --output-junit "$ROOT_DIR/$CI_REPORT_DIR/sanitize-unit-ctest.xml"; then
+  echo "[CI] Sanitizer unit CTest passed."
+else
+  echo "[CI] ERROR: Sanitizer unit CTest failed; continuing to create detailed internal JUnit."
+  sanitize_status=1
+fi
 
 UNIT_BIN="$(find_binary miniran_unit_tests)"
 
-"$UNIT_BIN" --junit "$ROOT_DIR/$CI_REPORT_DIR/sanitize-unit-internal.xml" \
-  2>&1 | tee "$ROOT_DIR/$CI_LOG_DIR/sanitize-unit-internal.log"
+if "$UNIT_BIN" --junit "$ROOT_DIR/$CI_REPORT_DIR/sanitize-unit-internal.xml" \
+  2>&1 | tee "$ROOT_DIR/$CI_LOG_DIR/sanitize-unit-internal.log"; then
+  echo "[CI] Sanitizer unit internal JUnit completed."
+else
+  echo "[CI] ERROR: Sanitizer unit internal test binary failed."
+  sanitize_status=1
+fi
 
 echo "[CI] Run sanitizer component tests"
 
-ctest --test-dir "$ROOT_DIR/$SANITIZE_BUILD_DIR" \
+if ctest --test-dir "$ROOT_DIR/$SANITIZE_BUILD_DIR" \
   -C "$SANITIZE_CTEST_CONFIG" \
   -L component \
   --output-on-failure \
   --output-log "$ROOT_DIR/$CI_LOG_DIR/sanitize-component-ctest.log" \
-  --output-junit "$ROOT_DIR/$CI_REPORT_DIR/sanitize-component-ctest.xml"
+  --output-junit "$ROOT_DIR/$CI_REPORT_DIR/sanitize-component-ctest.xml"; then
+  echo "[CI] Sanitizer component CTest passed."
+else
+  echo "[CI] ERROR: Sanitizer component CTest failed; continuing to create detailed internal JUnit."
+  sanitize_status=1
+fi
 
 COMPONENT_BIN="$(find_binary miniran_component_tests)"
 
-"$COMPONENT_BIN" --junit "$ROOT_DIR/$CI_REPORT_DIR/sanitize-component-internal.xml" \
-  2>&1 | tee "$ROOT_DIR/$CI_LOG_DIR/sanitize-component-internal.log"
+if "$COMPONENT_BIN" --junit "$ROOT_DIR/$CI_REPORT_DIR/sanitize-component-internal.xml" \
+  2>&1 | tee "$ROOT_DIR/$CI_LOG_DIR/sanitize-component-internal.log"; then
+  echo "[CI] Sanitizer component internal JUnit completed."
+else
+  echo "[CI] ERROR: Sanitizer component internal test binary failed."
+  sanitize_status=1
+fi
 
 echo "[CI] Run sanitizer CLI smoke"
 
@@ -157,7 +179,17 @@ fi
 echo "[CI] Sanitizer CLI smoke scenario: $SCENARIO_FILE" \
   | tee "$ROOT_DIR/$CI_LOG_DIR/sanitize-cli-smoke.log"
 
-"$CLI_BIN" "$SCENARIO_FILE" \
-  2>&1 | tee -a "$ROOT_DIR/$CI_LOG_DIR/sanitize-cli-smoke.log"
+if "$CLI_BIN" "$SCENARIO_FILE" \
+  2>&1 | tee -a "$ROOT_DIR/$CI_LOG_DIR/sanitize-cli-smoke.log"; then
+  echo "[CI] Sanitizer CLI smoke passed."
+else
+  echo "[CI] ERROR: Sanitizer CLI smoke failed."
+  sanitize_status=1
+fi
+
+if [[ "$sanitize_status" -ne 0 ]]; then
+  echo "[CI] Sanitizer checks failed after diagnostics were collected."
+  exit 1
+fi
 
 echo "[CI] Sanitizer checks completed."
