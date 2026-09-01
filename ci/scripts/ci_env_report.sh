@@ -183,6 +183,7 @@ check_required_files() {
     "ci/scripts/ci_mega_gate.sh"
     "ci/scripts/ci_test_sanitizers.sh"
     "ci/scripts/ci_static_analysis.sh"
+    "ci/scripts/ci_test_coverage.sh"
     "ci/scripts/ci_collect_logs.sh"
 
     "src/main.cpp"
@@ -229,6 +230,7 @@ check_script_executable_bits() {
     "ci/scripts/ci_mega_gate.sh"
     "ci/scripts/ci_test_sanitizers.sh"
     "ci/scripts/ci_static_analysis.sh"
+    "ci/scripts/ci_test_coverage.sh"
     "ci/scripts/ci_collect_logs.sh"
   )
 
@@ -310,6 +312,7 @@ check_cmake_contract() {
   local required_patterns=(
     "MINIRAN_BUILD_TESTS"
     "MINIRAN_ENABLE_SANITIZERS"
+    "MINIRAN_ENABLE_COVERAGE"
     "miniran_unit_tests"
     "miniran_component_tests"
     "miniran_mega_tests"
@@ -355,8 +358,10 @@ check_jenkins_contract() {
     "ci_mega_gate.sh"
     "ci_test_sanitizers.sh"
     "ci_static_analysis.sh"
+    "ci_test_coverage.sh"
     "ci_collect_logs.sh"
     "Static analysis"
+    "Coverage"
     "archiveArtifacts"
     "junit"
   )

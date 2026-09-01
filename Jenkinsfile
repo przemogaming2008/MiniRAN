@@ -16,6 +16,8 @@ pipeline {
         CI_ARTIFACT_DIR = 'ci_out/artifacts'
         CI_EXPECT_TEST_REPORTS = 'false'
         MINIRAN_STATIC_ANALYSIS_STRICT = '0'
+        MINIRAN_COVERAGE_STRICT = '0'
+        MINIRAN_COVERAGE_MIN_LINE_PERCENT = '0'
     }
 
     stages {
@@ -23,7 +25,7 @@ pipeline {
         stage('00 Clean workspace outputs') {
             steps {
                 sh '''
-                    rm -rf build/ci ci_out
+                    rm -rf build/ci build/coverage ci_out
                     mkdir -p ci_out/logs ci_out/reports ci_out/artifacts
                 '''
             }
@@ -77,6 +79,12 @@ pipeline {
         stage('08 Static analysis') {
             steps {
                 sh 'bash ci/scripts/ci_static_analysis.sh'
+            }
+        }
+
+        stage('09 Coverage') {
+            steps {
+                sh 'bash ci/scripts/ci_test_coverage.sh'
             }
         }
     }

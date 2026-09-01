@@ -26,6 +26,7 @@ The project contains:
 - JUnit XML reports
 - collected logs and artifacts
 - static analysis CI stage
+- coverage CI stage
 
 ## What this project is not
 
@@ -56,6 +57,12 @@ For the sanitizer stage:
 
     clang_rt.asan_dynamic-x86_64.dll
 
+For the coverage stage:
+
+- GCC-compatible coverage flags are used when available
+- `gcov` is used to create text coverage data
+- by default, unavailable coverage tooling is reported as a warning
+
 ## Repository layout
 
     include/miniran/      public headers
@@ -82,6 +89,7 @@ Run from repository root:
     bash ci/scripts/ci_mega_gate.sh
     bash ci/scripts/ci_test_sanitizers.sh
     bash ci/scripts/ci_static_analysis.sh
+    bash ci/scripts/ci_test_coverage.sh
     bash ci/scripts/ci_collect_logs.sh
 
 This sequence should match the normal Jenkins pipeline.
@@ -99,6 +107,10 @@ Normal build directory:
 Sanitizer build directory:
 
     build/sanitize
+
+Coverage build directory:
+
+    build/coverage
 
 ## Manual CMake usage
 
@@ -119,6 +131,10 @@ Run aggregate baseline test target:
 Run sanitizer stage manually:
 
     bash ci/scripts/ci_test_sanitizers.sh
+
+Run coverage stage manually:
+
+    bash ci/scripts/ci_test_coverage.sh
 
 Run CLI manually:
 
@@ -217,6 +233,37 @@ Outputs:
     ci_out/logs/static-analysis.log
     ci_out/reports/static-analysis.xml
 
+## Coverage
+
+The Jenkins pipeline runs a coverage stage after Static analysis.
+
+The coverage stage uses:
+
+    ci/scripts/ci_test_coverage.sh
+
+It creates a separate build directory:
+
+    build/coverage
+
+Default mode:
+
+    MINIRAN_COVERAGE_STRICT=0
+    MINIRAN_COVERAGE_MIN_LINE_PERCENT=0
+
+In default mode, unavailable coverage tooling is reported as a warning and does not fail the pipeline.
+
+Strict mode can be enabled with:
+
+    MINIRAN_COVERAGE_STRICT=1
+
+Outputs:
+
+    ci_out/logs/coverage.log
+    ci_out/logs/coverage-gcov.log
+    ci_out/reports/coverage.xml
+    ci_out/artifacts/coverage-summary.txt
+    ci_out/artifacts/coverage-gcov/
+
 ## Jenkins
 
 The Jenkins pipeline is defined in:
@@ -245,7 +292,8 @@ The normal Jenkins pipeline runs:
 6. Mega Gate
 7. Sanitizers
 8. Static analysis
-9. post-build log collection, artifact archiving and JUnit publishing
+9. Coverage
+10. post-build log collection, artifact archiving and JUnit publishing
 
 ## More documentation
 

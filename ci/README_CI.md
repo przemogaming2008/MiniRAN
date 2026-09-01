@@ -18,6 +18,10 @@ The sanitizer script uses a separate build directory:
 
     SANITIZE_BUILD_DIR=build/sanitize
 
+The coverage script uses a separate build directory:
+
+    COVERAGE_BUILD_DIR=build/coverage
+
 Scripts create directories when needed.
 
 ## Scripts
@@ -215,6 +219,44 @@ Run:
 
     bash ci/scripts/ci_static_analysis.sh
 
+### ci_test_coverage.sh
+
+Purpose:
+
+- configures a separate coverage build
+- enables coverage instrumentation when supported
+- runs tests to create coverage data
+- writes a JUnit report and coverage summary
+
+Build directory:
+
+    build/coverage
+
+Default mode:
+
+    MINIRAN_COVERAGE_STRICT=0
+    MINIRAN_COVERAGE_MIN_LINE_PERCENT=0
+
+In default mode, unavailable coverage tooling is reported as a warning.
+
+Strict mode:
+
+    MINIRAN_COVERAGE_STRICT=1
+
+In strict mode, coverage setup or threshold failures fail the stage.
+
+Outputs:
+
+    ci_out/logs/coverage.log
+    ci_out/logs/coverage-gcov.log
+    ci_out/reports/coverage.xml
+    ci_out/artifacts/coverage-summary.txt
+    ci_out/artifacts/coverage-gcov/
+
+Run:
+
+    bash ci/scripts/ci_test_coverage.sh
+
 ### ci_collect_logs.sh
 
 Purpose:
@@ -245,6 +287,7 @@ If tar or gzip fails, Jenkins should still archive raw `ci_out` files.
     bash ci/scripts/ci_mega_gate.sh
     bash ci/scripts/ci_test_sanitizers.sh
     bash ci/scripts/ci_static_analysis.sh
+    bash ci/scripts/ci_test_coverage.sh
     bash ci/scripts/ci_collect_logs.sh
 
 This sequence should match the normal Jenkins pipeline.
@@ -264,6 +307,10 @@ Sanitizer binaries are usually in:
 
     build/sanitize/Debug/
     build/sanitize/Release/
+
+Coverage binaries are usually in:
+
+    build/coverage/
 
 or, on single-config generators:
 

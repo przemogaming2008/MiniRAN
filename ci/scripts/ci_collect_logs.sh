@@ -7,6 +7,7 @@ set -Eeuo pipefail
 : "${CI_REPORT_DIR:=ci_out/reports}"
 : "${CI_ARTIFACT_DIR:=ci_out/artifacts}"
 : "${STATIC_BUILD_DIR:=build/static-analysis}"
+: "${COVERAGE_BUILD_DIR:=build/coverage}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -15,6 +16,7 @@ mkdir -p "$ROOT_DIR/$CI_LOG_DIR" "$ROOT_DIR/$CI_REPORT_DIR" "$ROOT_DIR/$CI_ARTIF
 
 SUMMARY="$ROOT_DIR/$CI_ARTIFACT_DIR/summary.md"
 ARCHIVE="$ROOT_DIR/$CI_ARTIFACT_DIR/miniran-ci-logs.tar.gz"
+ARCHIVE_TMP="$ROOT_DIR/$CI_OUT/miniran-ci-logs.tar.gz.tmp"
 
 count_files() {
   local dir="$1"
@@ -44,6 +46,14 @@ write_missing_log_note() {
   fi
 }
 
+write_missing_artifact_note() {
+  local artifact="$1"
+
+  if [[ ! -e "$ROOT_DIR/$CI_ARTIFACT_DIR/$artifact" ]]; then
+    echo "- Missing artifact: \`$CI_ARTIFACT_DIR/$artifact\`"
+  fi
+}
+
 {
   echo "# MiniRAN CI summary"
   echo ""
@@ -60,6 +70,7 @@ write_missing_log_note() {
   echo ""
   echo "- Build directory: \`$BUILD_DIR\`"
   echo "- Static analysis build directory: \`$STATIC_BUILD_DIR\`"
+  echo "- Coverage build directory: \`$COVERAGE_BUILD_DIR\`"
   echo "- CI output directory: \`$CI_OUT\`"
   echo "- Logs directory: \`$CI_LOG_DIR\`"
   echo "- Reports directory: \`$CI_REPORT_DIR\`"
@@ -85,6 +96,11 @@ write_missing_log_note() {
   write_missing_report_note "sanitize-component-ctest.xml"
   write_missing_report_note "sanitize-component-internal.xml"
   write_missing_report_note "static-analysis.xml"
+  write_missing_report_note "coverage.xml"
+  echo ""
+  echo "## Expected artifacts"
+  echo ""
+  write_missing_artifact_note "coverage-summary.txt"
   echo ""
   echo "## Expected logs"
   echo ""
@@ -104,6 +120,8 @@ write_missing_log_note() {
   write_missing_log_note "sanitize-component-internal.log"
   write_missing_log_note "sanitize-cli-smoke.log"
   write_missing_log_note "static-analysis.log"
+  write_missing_log_note "coverage.log"
+  write_missing_log_note "coverage-gcov.log"
   echo ""
   echo "## Optional static analysis tool logs"
   echo ""
@@ -146,11 +164,27 @@ if ! command -v tar >/dev/null 2>&1; then
   exit 1
 fi
 
-tar -czf "$ARCHIVE" \
-  -C "$ROOT_DIR" \
-  "$CI_LOG_DIR" \
-  "$CI_REPORT_DIR" \
+tar_inputs=(
+  "$CI_LOG_DIR"
+  "$CI_REPORT_DIR"
   "$CI_ARTIFACT_DIR/summary.md"
+)
+
+if [[ -f "$ROOT_DIR/$CI_ARTIFACT_DIR/coverage-summary.txt" ]]; then
+  tar_inputs+=("$CI_ARTIFACT_DIR/coverage-summary.txt")
+fi
+
+if [[ -d "$ROOT_DIR/$CI_ARTIFACT_DIR/coverage-gcov" ]]; then
+  tar_inputs+=("$CI_ARTIFACT_DIR/coverage-gcov")
+fi
+
+rm -f "$ARCHIVE_TMP"
+
+tar -czf "$ARCHIVE_TMP" \
+  -C "$ROOT_DIR" \
+  "${tar_inputs[@]}"
+
+mv "$ARCHIVE_TMP" "$ARCHIVE"
 
 echo "[CI] Collected CI summary: $SUMMARY"
 echo "[CI] Created CI archive: $ARCHIVE"

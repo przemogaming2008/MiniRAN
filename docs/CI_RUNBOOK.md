@@ -25,6 +25,12 @@ For the sanitizer stage:
 
   clang_rt.asan_dynamic-x86_64.dll
 
+For the coverage stage:
+
+- GCC-compatible coverage flags are used when available
+- `gcov` is used to create text coverage data
+- unavailable coverage tooling is a warning unless strict mode is enabled
+
 The Jenkinsfile uses:
 
     agent any
@@ -43,6 +49,7 @@ Run from repository root:
     bash ci/scripts/ci_mega_gate.sh
     bash ci/scripts/ci_test_sanitizers.sh
     bash ci/scripts/ci_static_analysis.sh
+    bash ci/scripts/ci_test_coverage.sh
     bash ci/scripts/ci_collect_logs.sh
 
 This sequence should match the normal Jenkins pipeline.
@@ -60,6 +67,10 @@ Normal build directory:
 Sanitizer build directory:
 
     build/sanitize
+
+Coverage build directory:
+
+    build/coverage
 
 ## 3. Jenkins stages
 
@@ -266,6 +277,43 @@ Strict mode:
 
 In strict mode, missing tools or static analysis failures fail the stage.
 
+### 09 Coverage
+
+Runs:
+
+    bash ci/scripts/ci_test_coverage.sh
+
+Build directory:
+
+    build/coverage
+
+Logs:
+
+    ci_out/logs/coverage.log
+    ci_out/logs/coverage-gcov.log
+
+Report:
+
+    ci_out/reports/coverage.xml
+
+Artifacts:
+
+    ci_out/artifacts/coverage-summary.txt
+    ci_out/artifacts/coverage-gcov/
+
+Default mode:
+
+    MINIRAN_COVERAGE_STRICT=0
+    MINIRAN_COVERAGE_MIN_LINE_PERCENT=0
+
+In default mode, missing or unavailable coverage tooling is reported as a warning.
+
+Strict mode:
+
+    MINIRAN_COVERAGE_STRICT=1
+
+In strict mode, coverage setup or threshold failures fail the stage.
+
 ## 4. Post actions
 
 After every build Jenkins tries to:
@@ -429,6 +477,20 @@ Check Jenkins job configuration:
 - checkout log
 - Jenkins system log
 
+### Coverage fails or is unavailable
+
+Open:
+
+    ci_out/logs/coverage.log
+    ci_out/reports/coverage.xml
+    ci_out/artifacts/coverage-summary.txt
+
+If `coverage-summary.txt` contains `status=unavailable`, check compiler and `gcov` availability.
+
+If strict mode is disabled, unavailable coverage should be a warning.
+
+If strict mode is enabled, fix coverage tooling or lower the threshold.
+
 ### Static analysis fails
 
 Open:
@@ -481,6 +543,14 @@ Run static analysis manually:
 Run static analysis in strict mode:
 
     MINIRAN_STATIC_ANALYSIS_STRICT=1 bash ci/scripts/ci_static_analysis.sh
+
+Run coverage manually:
+
+    bash ci/scripts/ci_test_coverage.sh
+
+Run coverage in strict mode:
+
+    MINIRAN_COVERAGE_STRICT=1 bash ci/scripts/ci_test_coverage.sh
     
 ## 8. Controlled failure check
 
